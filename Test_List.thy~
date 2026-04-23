@@ -1,0 +1,117 @@
+theory Test_List
+imports
+  Main
+  Refine_Imperative_HOL.Sepref
+  Refine_Imperative_HOL.Sepref_HOL_Bindings
+  Refine_Imperative_HOL.IICF
+
+begin
+
+definition search_foreach :: "nat list \<Rightarrow> nat \<Rightarrow> bool nres" where
+"search_foreach xs y = do {
+  result \<leftarrow> nfoldli xs (\<lambda>found. \<not>found) 
+    (\<lambda>x _. RETURN (x = y))
+    False;
+  RETURN result
+}"
+
+sepref_definition search_foreach_impl is "uncurry search_foreach" :: 
+"(list_assn nat_assn)\<^sup>k *\<^sub>a nat_assn\<^sup>k \<rightarrow>\<^sub>a bool_assn"
+  unfolding search_foreach_def
+  apply sepref
+  done
+
+
+definition search_rec :: "nat list \<Rightarrow> nat \<Rightarrow> bool nres" where
+"search_rec xs y \<equiv> RECT(\<lambda>self (xs,y).
+case xs of
+  [] \<Rightarrow> RETURN False |
+  x#xss \<Rightarrow> do {
+    if x = y then RETURN True
+    else do {r \<leftarrow> self(xss,y); RETURN r}
+  }
+)(xs,y) "
+
+sepref_definition search_rec_impl is "uncurry search_rec" :: "(list_assn nat_assn)\<^sup>k *\<^sub>a nat_assn\<^sup>k \<rightarrow>\<^sub>a bool_assn"
+  unfolding search_rec_def
+  apply sepref
+  done
+
+
+definition incr_list2 where "incr_list2 l \<equiv> nfoldli 
+  [0..<length l]
+  (\<lambda>_. True)
+  (\<lambda>i l. ASSERT (i<length l) \<then> RETURN (l[i:=1+l!i]))
+  l"
+
+sepref_definition incr_list3 is "incr_list2" ::
+ "(array_assn nat_assn)\<^sup>d \<rightarrow>\<^sub>a array_assn nat_assn"
+  unfolding incr_list2_def[abs_def]
+  by sepref
+
+
+definition is_list where
+"is_list xs \<equiv> case xs of [] \<Rightarrow> RETURN xs | x#xss \<Rightarrow> RETURN xs"
+
+sepref_definition is_list_impl is "is_list" 
+  :: "(list_assn  nat_assn)\<^sup>k \<rightarrow>\<^sub>a list_assn  nat_assn"
+  unfolding is_list_def[abs_def]
+  by sepref
+
+definition append :: "nat \<Rightarrow> nat list \<Rightarrow> nat list nres" where
+"append y xs = RETURN (y#xs)"
+
+sepref_definition append_impl is "uncurry append"
+::" nat_assn\<^sup>k  *\<^sub>a (list_assn nat_assn)\<^sup>d  \<rightarrow>\<^sub>a list_assn nat_assn"
+  unfolding append_def[abs_def]
+  apply sepref
+  done
+
+export_code append_impl in Haskell
+
+definition remove :: "nat \<Rightarrow> nat list \<Rightarrow> nat list nres" where
+"remove y xs = do {
+  l \<leftarrow> nfoldli xs 
+    (\<lambda>_. True)
+    (\<lambda>x acc. if x \<noteq> y then RETURN (x#acc) else RETURN (acc))
+     xs;
+  RETURN l
+}"
+
+sepref_definition remove_impl is "uncurry remove"
+:: " nat_assn\<^sup>k *\<^sub>a (list_assn nat_assn)\<^sup>d \<rightarrow>\<^sub>a list_assn nat_assn"
+  unfolding remove_def[abs_def]
+  apply sepref
+  done
+
+export_code remove_impl in Haskell
+
+
+definition bubble_sort :: "int list \<Rightarrow> int list nres" where
+"bubble_sort xs = do {
+  let n = length xs;
+  (_, result, _) \<leftarrow> nfoldli [0..<n-1] (\<lambda>(swapped, _, _). swapped) 
+    (\<lambda>i (swapped, arr, _). do {
+      (_, arr, _) \<leftarrow> nfoldli [0..<n-i-1] (\<lambda>(_, _, _). True)
+        (\<lambda>j (_, arr, _). do {
+          if (arr ! j) > (arr ! (j+1)) then do {
+            let arr = list_update arr j (arr ! (j+1));
+            let arr = list_update arr (j+1) (arr ! j);
+            RETURN (True, arr, ())
+          } else 
+            RETURN (False, arr, ())
+        }) (False, arr, ());
+      RETURN (swapped, arr, ())
+    }) (True, xs, ());
+  
+  RETURN result
+}"
+sepref_definition bubble_sort_impl is "bubble_sort" 
+::"(array_assn int_assn)\<^sup>d \<rightarrow>\<^sub>a array_assn int_assn"
+  unfolding bubble_sort_def[abs_def]
+  unfolding list_update_def[abs_def]
+  apply sepref_dbg_keep
+  apply sepref                              
+  done
+
+end

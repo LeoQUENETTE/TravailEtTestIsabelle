@@ -1,0 +1,49 @@
+theory Test_Addition
+imports 
+  Main
+  Refine_Imperative_HOL.Sepref
+begin
+
+definition addition :: "nat \<Rightarrow> nat \<Rightarrow> nat nres"  where
+"addition x y = RETURN (x +y)"
+
+value "addition 5 3"
+
+sepref_definition addition_impl is "uncurry addition" ::
+"(nat_assn\<^sup>d *\<^sub>a nat_assn\<^sup>d) \<rightarrow>\<^sub>a nat_assn"
+  unfolding addition_def
+  apply sepref_dbg_keep
+  done
+
+export_code addition_impl in Haskell
+
+definition addition_rect :: "nat \<Rightarrow> nat \<Rightarrow> nat nres" where
+  "addition_rect n m \<equiv> RECT (\<lambda>self (n,m). 
+    if n=0 then RETURN m
+    else do { r \<leftarrow> self (n-1, m); RETURN (Suc r) }
+  ) (n,m)"
+
+sepref_definition addition_impl_rec is "uncurry addition_rect" ::
+"(nat_assn)\<^sup>k*\<^sub>a(nat_assn)\<^sup>k \<rightarrow>\<^sub>a nat_assn"
+  unfolding addition_rect_def
+  apply sepref
+  done
+
+export_code addition_impl_rec in Haskell
+
+definition addition_while :: "nat \<Rightarrow> nat \<Rightarrow> nat nres" where
+  "addition_while n m \<equiv> do {
+    (n', r) \<leftarrow> WHILE\<^sub>T (\<lambda>(n', r). n' > 0) 
+      (\<lambda>(n', r). RETURN (n' - 1, r + 1))
+      (n, m);
+    RETURN r
+  }"
+
+sepref_definition addition_impl_while is
+  "uncurry addition_while" :: "(nat_assn)\<^sup>k*\<^sub>a(nat_assn)\<^sup>k \<rightarrow>\<^sub>a nat_assn"
+  unfolding addition_while_def
+  apply sepref
+  done
+
+export_code addition_impl_while in Haskell
+end

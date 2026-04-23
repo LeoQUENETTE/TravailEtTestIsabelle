@@ -1,0 +1,156 @@
+theory Test_Term
+  imports 
+    Main
+    First_Order_Terms.Term
+    Refine_Imperative_HOL.Sepref
+    Refine_Imperative_HOL.IICF
+
+begin
+
+lemma size_mem_le: "x \<in> set ts \<Longrightarrow> size x \<le> size_list size ts"
+  apply (induct ts)
+   apply auto
+  done
+function sizeTerm :: "('a, 'b) term \<Rightarrow> nat" where
+  "sizeTerm (Var x) = 1"
+| "sizeTerm (Fun f ts) = 1 + sum_list (map sizeTerm ts)"
+  by pat_completeness auto
+  termination
+  apply (relation "measure size")
+  apply auto
+    apply (simp add: less_Suc_eq_le member_le_sum_list)
+    apply (simp add: less_Suc_eq_le size_mem_le)
+  done
+
+lemma sizeTerm_positive: "sizeTerm t \<ge> 1"
+apply (induct t)
+ apply (auto simp add: sizeTerm.simps)
+  done
+
+value "sizeTerm (Fun a [Fun b [Var {5}]] :: (nat,nat set) term)"
+value "sizeTerm ((Fun 5 [Var 5])  :: (nat, nat) term)"
+
+lemma size_mem_add:
+  "x \<in> set ts \<Longrightarrow> xa \<in> set us \<Longrightarrow> 
+   size x + size xa \<le> size_list size ts + size_list size us"
+  using size_mem_le by (meson add_le_mono)
+
+fun term_assn :: 
+  "('fa \<Rightarrow> 'fc \<Rightarrow> assn) \<Rightarrow> ('va \<Rightarrow> 'vc \<Rightarrow> assn) \<Rightarrow> ('fa, 'va) term \<Rightarrow> ('fc, 'vc) term \<Rightarrow> assn" 
+and term_list_assn ::
+  "('fa \<Rightarrow> 'fc \<Rightarrow> assn) \<Rightarrow> ('va \<Rightarrow> 'vc \<Rightarrow> assn) \<Rightarrow> ('fa, 'va) term list \<Rightarrow> ('fc, 'vc) term list \<Rightarrow> assn"
+where
+  "term_assn F V (Var x) (Var y) = V x y"
+| "term_assn F V (Fun f ts) (Fun g us) = F f g * term_list_assn F V ts us"
+| "term_assn F V _ _ = false"
+| "term_list_assn F V [] [] = emp"
+| "term_list_assn F V (t#ts) (u#us) = term_assn F V t u * term_list_assn F V ts us"
+| "term_list_assn F V _ _ = false"
+
+print_theorems
+
+fun term_assn_id :: "('a,'v )term \<Rightarrow>('a,'v ) term nres" where
+  "term_assn_id t = RETURN t"
+
+lemma term_assn_all_elems_pure[simp] :
+  assumes "is_pure F" and "is_pure V"
+  shows "\<exists>P'. \<forall>(x::('fa, 'va) term) (x'::('fc, 'vc) term). term_assn F V x x' = \<up> (P' x x')"
+proof -
+  from assms(2) obtain PV where PV: "\<forall>v v'. V v v' = \<up> (PV v v')"
+    unfolding is_pure_def by blast
+  from assms(1) obtain PF where PF: "\<forall>f f'. F f f' = \<up> (PF f f')"
+    unfolding is_pure_def by blast
+    
+  define P' where "P' \<equiv> \<lambda>x x'. case (x, x') of
+    (Var v, Var v') \<Rightarrow> PV v v'
+  | (Fun f ts, Fun g us) \<Rightarrow> PF f g
+  | _ \<Rightarrow> False"
+  
+  show ?thesis
+    apply (rule exI[where x=P'])
+    apply (intro allI)
+    apply (case_tac x; case_tac x')
+    subgoal for v v'
+      apply (auto simp: P'_def PV)
+      done
+    subgoal for v f
+      apply (auto simp: P'_def)
+      done
+    subgoal for f v
+      apply (auto simp: P'_def)
+      done
+    subgoal for f f'
+      apply (auto simp: P'_def PF)
+      sorry
+    done
+qed
+
+
+lemma term_list_assn_all_elems_pure[simp] :
+  assumes "is_pure F" and "is_pure V"
+  shows "\<exists>P'. \<forall>(xs::('fa, 'va) term list) (xs'::('fc, 'vc) term list). term_list_assn F V xs xs' = \<up> (P' xs xs')"
+proof -
+  from assms(1) obtain PV where PV: "\<forall>v v'. V v v' = \<up> (PV v v')"
+    unfolding is_pure_def 
+    sorry
+
+  define P' where "P' \<equiv> \<lambda>x x'. case (x, x') of
+    ([], []) \<Rightarrow> PV [] []
+  | (a # as, c # cs) \<Rightarrow> PF a cs
+  | _ \<Rightarrow> False" 
+  show ?thesis
+  using assms
+  apply (auto simp: intro!: exI)
+  
+  apply (rename_tac l li)
+  apply (case_tac l; case_tac li)
+  subgoal
+    apply induct_tac 
+    apply (sep_auto)
+   
+    done
+qed
+  oops
+lemma term_assn_pure [safe_constraint_rules]:
+  assumes 
+    pA: "is_pure F" and
+    pB: "is_pure V" 
+  shows 
+    "is_pure (term_assn F V)"  and "is_pure (term_list_assn F V)"
+  unfolding is_pure_def
+  oops
+  
+sepref_definition term_assn_id_impl is "term_assn_id" ::
+"(term_assn nat_assn nat_assn)\<^sup>k \<rightarrow>\<^sub>a (term_assn id_assn id_assn)"
+  unfolding term_assn_id.simps
+  apply sepref_dbg_keep
+  done
+export_code term_assn_id_impl in Haskell
+
+
+
+
+
+(*Is VAR OK*)
+definition is_var_impl_aux :: "('fc, 'vc) term \<Rightarrow> bool" where
+  "is_var_impl_aux t \<equiv> case t of Var _ \<Rightarrow> True | Fun _ _ \<Rightarrow> False"
+  
+definition is_var_nres :: "('f, 'v) term \<Rightarrow> bool nres" where
+"is_var_nres t \<equiv> RETURN (is_Var t)"
+
+lemma is_var_hnr[sepref_fr_rules]:
+  "(return o is_var_impl_aux, RETURN o is_Var) \<in> 
+   (term_assn nat_assn nat_assn)\<^sup>k \<rightarrow>\<^sub>a bool_assn"
+  unfolding is_var_impl_aux_def
+  apply (sepref_to_hoare)
+  apply (rename_tac x xi)
+  apply (case_tac x; case_tac xi; sep_auto)
+  done
+  
+sepref_definition is_var_impl is "is_var_nres" :: 
+"(term_assn nat_assn nat_assn)\<^sup>k \<rightarrow>\<^sub>a bool_assn"
+  unfolding is_var_nres_def
+  apply sepref_dbg_keep
+  done
+export_code is_var_impl in Haskell
+end

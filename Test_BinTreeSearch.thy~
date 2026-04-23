@@ -1,0 +1,149 @@
+theory Test_BinTreeSearch
+imports
+  Main
+  Refine_Imperative_HOL.Sepref
+begin
+
+datatype node =
+  NodeC nat  "node ref option"  "node ref option"
+
+instance node :: countable by countable_datatype
+
+instance node :: heap ..
+
+datatype tree =
+    Leaf
+    | Node (val: "nat") (left: "tree") (right: "tree")
+
+sepref_register NodeC
+sepref_register Leaf Node
+type_synonym tree_ptr = "node ref option"
+
+fun tree_assn :: " tree \<Rightarrow>  tree_ptr \<Rightarrow> assn" where
+  "tree_assn Leaf None = emp"
+| "tree_assn (Node v l r) (Some p) =
+    (\<exists>\<^sub>A lp rp.
+      p \<mapsto>\<^sub>r NodeC v lp rp  *  
+      tree_assn l lp        *
+      tree_assn r rp)"
+| "tree_assn _ _ = false"
+
+lemma Leaf_hnr[sepref_fr_rules]:
+  "(uncurry0 (return None), uncurry0 (RETURN Leaf)) \<in> unit_assn\<^sup>k \<rightarrow>\<^sub>a tree_assn"
+  unfolding pure_def tree_assn.simps hn_refine_def
+  apply (intro hfrefI hn_refineI)  
+  apply sep_auto
+  done
+
+sepref_definition Leaf_impl is "uncurry0 (RETURN Leaf)" 
+  :: "unit_assn\<^sup>k \<rightarrow>\<^sub>a tree_assn"
+  by sepref
+
+
+definition tree_is_leaf :: "tree \<Rightarrow> bool nres" where
+  "tree_is_leaf t \<equiv> RETURN (t = Leaf)"
+
+definition tree_val_spec :: "tree \<Rightarrow> nat nres" where
+  "tree_val_spec t \<equiv> case t of 
+    Node v _ _ \<Rightarrow> RETURN v 
+  | Leaf \<Rightarrow> SPEC (\<lambda>_. False)"
+
+definition tree_val :: "tree \<Rightarrow> nat nres" where
+  "tree_val t \<equiv> do {
+    is_leaf \<leftarrow> tree_is_leaf t;
+    if is_leaf then RETURN (0::nat)
+    else RETURN tree_val_spec
+  }"
+
+sepref_register tree_val
+
+lemma op_tree_is_leaf_hnr[sepref_fr_rules]:
+  "(\<lambda>ti. return (ti = None), tree_is_leaf) 
+   \<in> tree_assn\<^sup>k \<rightarrow>\<^sub>a bool_assn"
+  unfolding tree_is_leaf_def hn_ctxt_def pure_def
+  apply sepref_to_hoare
+  apply (simp add: nofail_def)
+  apply sep_auto
+  subgoal for x a b 
+    apply (cases x)
+    subgoal
+      apply simp
+      done
+    subgoal 
+      apply simp
+      done
+    done
+  subgoal for xi a b
+    apply (cases xi)
+    subgoal
+      apply simp
+      done
+    subgoal
+      apply simp
+      done
+    done
+  done
+sepref_decl_intf i_tree is "tree"
+
+lemma [intf_of_assn]: 
+  "intf_of_assn tree_assn TYPE(i_tree)"
+  by simp
+
+lemma hn_tree_is_leaf2[sepref_fr_rules]:
+  "(\<lambda>ti. return (ti = None), tree_is_leaf) 
+   \<in> [\<lambda>t. True]\<^sub>a tree_assn\<^sup>k \<rightarrow> bool_assn"
+  unfolding tree_is_leaf_def pure_def
+  apply (intro hfrefI hn_refineI)
+  apply sep_auto
+  subgoal
+    apply (simp add: pure_def)
+    apply simp
+    apply sep_auto
+    apply (sep_auto elim: tree_assn.elims)
+    sorry
+  subgoal
+    apply (sep_auto simp: tree_assn.elims)
+    sorry
+  sorry  
+lemma hn_tree_is_Leaf[simp]:
+  "hn_refine (hn_ctxt tree_assn Leaf ti) 
+             (return (ti = None)) 
+             (hn_ctxt tree_assn Leaf ti) 
+             bool_assn 
+             (RETURN (ti = None))"
+  apply (simp add: hn_ctxt_def hn_refine_def )
+  apply sep_auto
+  apply (cases)
+  subgoal
+    apply (induct_tac ti)
+    subgoal
+      apply simp
+      apply (sep_auto simp: pure_def)
+      done
+    subgoal
+      apply simp
+      done
+    done
+  subgoal
+    apply (induct_tac ti)
+    subgoal
+      apply simp
+      apply (sep_auto simp :pure_def)
+      done
+    subgoal
+      apply simp
+      done
+    done
+  done
+
+sepref_definition get_value_impl is "tree_val" :: 
+"tree_assn\<^sup>k \<rightarrow>\<^sub>a nat_assn"
+  unfolding tree_val_def 
+  apply simp
+  apply sepref_dbg_keep
+  supply [[goals_limit = 5]]
+      apply sepref_dbg_trans_keep
+      apply sepref_dbg_trans_step_keep
+  done
+  oops
+end
