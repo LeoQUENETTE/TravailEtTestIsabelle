@@ -1,11 +1,11 @@
 section \<open>Imperative Implementation of Dijkstra's Shortest Paths Algorithm\<close>
 theory Sepref_Dijkstra
-  imports 
-  Refine_Imperative_HOL.Sepref
-  Refine_Imperative_HOL.Sepref_Graph
-  Refine_Imperative_HOL.IICF
+imports 
+  "../IICF/IICF"
+  "../Sepref_ICF_Bindings"
   Dijkstra_Shortest_Path.Dijkstra
   Dijkstra_Shortest_Path.Test
+  "HOL-Library.Code_Target_Numeral"
   (*"../../../DFS_Framework/Misc/DFS_Framework_Refine_Aux"*)
   Sepref_WGraph
 begin

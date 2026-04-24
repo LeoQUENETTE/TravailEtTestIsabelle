@@ -47,10 +47,10 @@ where
 | "term_list_assn F V (t#ts) (u#us) = term_assn F V t u * term_list_assn F V ts us"
 | "term_list_assn F V _ _ = false"
 
+print_theorems
+
 fun term_assn_id :: "('a,'v )term \<Rightarrow>('a,'v ) term nres" where
   "term_assn_id t = RETURN t"
-
-find_theorems "\<up> ?a1 * \<up> ?b1 \<equiv> \<up>_"
 
 lemma term_assn_all_elems_pure[simp] :
   assumes "is_pure F" and "is_pure V"
@@ -84,38 +84,33 @@ proof -
       sorry
     done
 qed
+
+
 lemma term_list_assn_all_elems_pure[simp] :
   assumes "is_pure F" and "is_pure V"
-  shows "\<exists>P'. \<forall>(x::('fa, 'va) term) (x'::('fc, 'vc) term). term_list_assn F V x x' = \<up> (P' x x')"
+  shows "\<exists>P'. \<forall>(xs::('fa, 'va) term list) (xs'::('fc, 'vc) term list). term_list_assn F V xs xs' = \<up> (P' xs xs')"
 proof -
-  from assms(2) obtain PV where PV: "\<forall>v v'. V v v' = \<up> (PV v v')"
-    unfolding is_pure_def by blast
-  from assms(1) obtain PF where PF: "\<forall>f f'. F f f' = \<up> (PF f f')"
-    unfolding is_pure_def by blast
-    
+  from assms(1) obtain PV where PV: "\<forall>v v'. V v v' = \<up> (PV v v')"
+    unfolding is_pure_def 
+    sorry
+
   define P' where "P' \<equiv> \<lambda>x x'. case (x, x') of
-    (Var v, Var v') \<Rightarrow> PV v v'
-  | (Fun f ts, Fun g us) \<Rightarrow> PF f g
-  | _ \<Rightarrow> False"
-  
+    ([], []) \<Rightarrow> PV [] []
+  | (a # as, c # cs) \<Rightarrow> PF a cs
+  | _ \<Rightarrow> False" 
   show ?thesis
-    apply (rule exI[where x=P'])
-    apply (intro allI)
-    apply (case_tac x; case_tac x')
-    subgoal for v v'
-      apply (auto simp: P'_def PV)
-      done
-    subgoal for v f
-      apply (auto simp: P'_def)
-      done
-    subgoal for f v
-      apply (auto simp: P'_def)
-      done
-    subgoal for f f'
-      apply (auto simp: P'_def PF)
-      sorry
+  using assms
+  apply (auto simp: intro!: exI)
+  
+  apply (rename_tac l li)
+  apply (case_tac l; case_tac li)
+  subgoal
+    apply induct_tac 
+    apply (sep_auto)
+   
     done
 qed
+  oops
 lemma term_assn_pure [safe_constraint_rules]:
   assumes 
     pA: "is_pure F" and
@@ -123,7 +118,7 @@ lemma term_assn_pure [safe_constraint_rules]:
   shows 
     "is_pure (term_assn F V)"  and "is_pure (term_list_assn F V)"
   unfolding is_pure_def
-  sorry
+  oops
   
 sepref_definition term_assn_id_impl is "term_assn_id" ::
 "(term_assn nat_assn nat_assn)\<^sup>k \<rightarrow>\<^sub>a (term_assn id_assn id_assn)"
@@ -149,15 +144,7 @@ lemma is_var_hnr[sepref_fr_rules]:
   unfolding is_var_impl_aux_def
   apply (sepref_to_hoare)
   apply (rename_tac x xi)
-  apply (case_tac x; case_tac xi)
-  subgoal
-    apply sep_auto done
-  subgoal
-    apply sep_auto done
-  subgoal 
-    apply sep_auto done
-  subgoal
-    apply sep_auto done
+  apply (case_tac x; case_tac xi; sep_auto)
   done
   
 sepref_definition is_var_impl is "is_var_nres" :: 

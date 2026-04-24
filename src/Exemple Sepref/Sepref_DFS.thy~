@@ -1,8 +1,8 @@
 section \<open>Simple DFS Algorithm\<close>
 theory Sepref_DFS
 imports 
-  Refine_Imperative_HOL.Sepref
-  Refine_Imperative_HOL.Sepref_Graph
+  "../Sepref"
+  Sepref_Graph
 begin
 
 text \<open>

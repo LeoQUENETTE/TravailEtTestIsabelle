@@ -1,9 +1,9 @@
 section \<open>Imperative Graph Representation\<close>
 theory Sepref_Graph
-  imports 
-  Refine_Imperative_HOL.Sepref
-  Refine_Imperative_HOL.Sepref_ICF_Bindings
-  Refine_Imperative_HOL.IICF
+imports 
+  "../Sepref"
+  "../Sepref_ICF_Bindings"
+  "../IICF/IICF"
   (*"../../../DFS_Framework/Misc/DFS_Framework_Refine_Aux"*)
 begin
 

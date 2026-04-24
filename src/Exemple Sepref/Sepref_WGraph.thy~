@@ -1,9 +1,7 @@
 section \<open>Imperative Weighted Graphs\<close>
 theory Sepref_WGraph
-  imports 
-  Refine_Imperative_HOL.Sepref_Graph
-  Refine_Imperative_HOL.Sepref
-  Refine_Imperative_HOL.IICF
+imports 
+  "../Sepref_ICF_Bindings"
   Dijkstra_Shortest_Path.Graph
 begin
   
