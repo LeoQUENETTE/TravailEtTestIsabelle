@@ -1,0 +1,110 @@
+theory Linear_Unification
+imports
+  Main
+  First_Order_Terms.Term_More
+begin
+
+datatype 'f symbol =
+	Star 
+| F 'f nat
+
+fun to_symbol :: "('f, 'v) term \<Rightarrow>'f symbol" where
+  "to_symbol (Var x) = Star "
+| "to_symbol (Fun f ts) = F f (length ts)"
+
+definition term_unification :: "('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool" where
+  "term_unification t1 t2 = (\<exists>\<sigma> :: ('f, 'v) subst. t1 \<cdot> \<sigma> = t2 \<cdot> \<sigma>)"
+
+definition term_instantiation :: "('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool" where
+  "term_instantiation t1 t2 = (\<exists>\<sigma> :: ('f, 'v) subst. t1 = t2 \<cdot> \<sigma>)"
+
+definition term_generalization :: "('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool" where
+  "term_generalization t1 t2 = term_instantiation t2 t1"
+
+definition term_variant :: "('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool" where
+  "term_variant t1 t2 = (\<exists>\<sigma> :: ('f, 'v) subst. (\<forall>t \<in> subst_range \<sigma>. is_Var t) \<and> t1 \<cdot> \<sigma> = t2)"
+
+inductive linear_instance :: "('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool" where
+  li_var: "linear_instance t (Var x)"
+| li_func: "length args1 = length args2 \<Longrightarrow> (\<forall>i. i < length args1 \<longrightarrow> linear_instance (args1 ! i) (args2 ! i)) \<Longrightarrow> linear_instance (Fun f args1) (Fun f args2)"
+
+definition linear_generalization :: "('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool" where
+  "linear_generalization t1 t2 = linear_instance t2 t1"
+
+inductive linear_unification :: "('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool" where
+  lu_varl: "linear_unification (Var x) t"
+| lu_varr: "linear_unification t (Var x)"
+| lu_func: "length args1 = length args2 \<Longrightarrow> (\<forall>i. i < length args1 \<longrightarrow> linear_unification (args1 ! i) (args2 ! i)) \<Longrightarrow> linear_unification (Fun f args1) (Fun f args2)"
+
+inductive linear_variant :: "('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool" where
+  lv_var: "linear_variant (Var x) (Var y)"
+| lv_func: "length args1 = length args2 \<Longrightarrow> (\<forall>i. i < length args1 \<longrightarrow> linear_variant (args1 ! i) (args2 ! i)) \<Longrightarrow> linear_variant (Fun f args1) (Fun f args2)"
+
+lemma linear_unification_necessary_condition:
+  "term_unification t1 t2 \<Longrightarrow> linear_unification t1 t2"
+proof (induction t1 arbitrary: t2)
+  case (Var x)
+  then show ?case using lu_varl by fast
+next
+  case (Fun f f_args)
+  then obtain \<sigma> :: "('a, 'b) subst" where h: "(Fun f f_args) \<cdot> \<sigma> = t2 \<cdot> \<sigma>"
+    unfolding term_unification_def by blast
+  show ?case
+  proof (cases t2)
+    case (Var y)
+    then show ?thesis using lu_varr by fast
+  next
+    case (Fun g g_args)
+    then show ?thesis
+      by (smt (verit, del_insts) Fun.IH eval_term.simps(2) h lu_func map_equality_iff nth_mem term.inject(2) term_unification_def)
+  qed
+qed
+
+lemma linear_instance_necessary_condition:
+  "term_instantiation t1 t2 \<Longrightarrow> linear_instance t1 t2"
+proof (induction t2 arbitrary: t1)
+  case (Var x)
+  then show ?case using li_var by fast
+next
+  case (Fun f f_args)
+  then obtain \<sigma> :: "('a, 'b) subst" where h: "t1 = (Fun f f_args) \<cdot> \<sigma>"
+    unfolding term_instantiation_def by auto
+  show ?case
+    by (smt (verit, del_insts) Fun.IH eval_term.simps(2) h term_instantiation_def length_map li_func nth_map nth_mem)
+qed
+
+lemma linear_generalization_necessary_condition:
+  "term_generalization t1 t2 \<Longrightarrow> linear_generalization t1 t2"
+  by (simp add: term_generalization_def linear_generalization_def linear_instance_necessary_condition)
+
+lemma linear_variant_necessary_condition:
+  "term_variant t1 t2 \<Longrightarrow> linear_variant t1 t2"
+proof (induction t2 arbitrary: t1)
+  case (Var x)
+  then show ?case
+  proof (cases t1)
+    case (Var y)
+    then show ?thesis using lv_var by auto
+  next
+    case (Fun g g_args)
+    then show ?thesis
+      using Var term_variant_def by force
+  qed
+next
+  case (Fun f f_args)
+  show ?case
+  proof (cases t1)
+    case (Var y)
+    then obtain \<sigma> :: "('a, 'b) subst" where "(Var y) \<cdot> \<sigma> = Fun f f_args"
+                                        and "is_Var (\<sigma> y)"
+      using Fun unfolding term_variant_def
+      by (metis (mono_tags, lifting) image_iff mem_Collect_eq subst_domain_def subst_range.simps term.disc(1))
+    then show ?thesis by force
+  next
+    case (Fun g g_args)
+    then show ?thesis
+      by (smt (verit, best) Fun.IH Fun.prems eval_term.simps(2) length_map lv_func nth_map nth_mem term_variant_def term.inject(2))
+  qed
+qed
+
+end

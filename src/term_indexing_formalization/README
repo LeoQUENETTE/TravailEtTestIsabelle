@@ -1,0 +1,9 @@
+# Prerequisites
+
+To build this formalization, you will need Isabelle (tested with Isabelle2024: https://isabelle.in.tum.de/) and the Archive of Formal Proofs (https://www.isa-afp.org/download/)
+
+# Build instructions
+
+To build, from the folder that host the ROOT file, run:
+
+isabelle build -d . -d /path/to/afp/thys -v Term_Indexing

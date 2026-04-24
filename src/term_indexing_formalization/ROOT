@@ -1,0 +1,10 @@
+session Term_Indexing = HOL +
+  options [timeout = 300]
+  sessions
+    "Finite-Map-Extras"
+    "First_Order_Terms"
+  theories
+    Path_Indexing
+    Linear_Unification
+  document_files
+    "root.tex"
