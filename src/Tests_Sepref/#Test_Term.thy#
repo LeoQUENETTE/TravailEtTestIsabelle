@@ -1,0 +1,134 @@
+theory Test_Term
+  imports 
+    Main
+    First_Order_Terms.Term
+    Refine_Imperative_HOL.Sepref
+    Refine_Imperative_HOL.IICF
+   
+
+begin
+
+
+fun term_relp :: 
+  "('fa \<Rightarrow> 'fc \<Rightarrow> bool) \<Rightarrow> ('va \<Rightarrow> 'vc \<Rightarrow> bool) \<Rightarrow> 
+   ('fa,'va) term \<Rightarrow> ('fc,'vc) term \<Rightarrow> bool"
+and term_list_relp ::
+  "('fa \<Rightarrow> 'fc \<Rightarrow> bool) \<Rightarrow> ('va \<Rightarrow> 'vc \<Rightarrow> bool) \<Rightarrow>
+   ('fa,'va) term list \<Rightarrow> ('fc,'vc) term list \<Rightarrow> bool"
+where
+  "term_relp F V (Var v)     (Var v')      \<longleftrightarrow> V v v'"
+| "term_relp F V (Fun f ts) (Fun f' ts')  \<longleftrightarrow> F f f' \<and> term_list_relp F V ts ts'"
+| "term_relp F V _           _             \<longleftrightarrow> False"
+| "term_list_relp F V []      []           \<longleftrightarrow> True"
+| "term_list_relp F V (t#ts) (t'#ts')     \<longleftrightarrow> term_relp F V t t' \<and> term_list_relp F V ts ts'"
+| "term_list_relp F V _       _            \<longleftrightarrow> False"
+
+definition term_rel :: 
+  "('fa \<times> 'fc) set \<Rightarrow> ('va \<times> 'vc) set \<Rightarrow> 
+   (('fa,'va) term \<times> ('fc,'vc) term) set"
+where
+  "term_rel F V \<equiv> {(t, t'). term_relp (\<lambda>x y. (x,y) \<in> F) (\<lambda>x y. (x,y) \<in> V) t t'}"
+
+fun term_assn :: 
+  "('fa \<Rightarrow> 'fc \<Rightarrow> assn) \<Rightarrow> ('va \<Rightarrow> 'vc \<Rightarrow> assn) \<Rightarrow> ('fa, 'va) term \<Rightarrow> ('fc, 'vc) term \<Rightarrow> assn" 
+and term_list_assn ::                                           
+  "('fa \<Rightarrow> 'fc \<Rightarrow> assn) \<Rightarrow> ('va \<Rightarrow> 'vc \<Rightarrow> assn) \<Rightarrow> ('fa, 'va) term list \<Rightarrow> ('fc, 'vc) term list \<Rightarrow> assn"
+where
+  "term_assn F V (Var x) (Var y) = V x y"
+| "term_assn F V (Fun f ts) (Fun g us) = F f g * term_list_assn F V ts us"
+| "term_assn F V _ _ = false"
+| "term_list_assn F V [] [] = emp"
+| "term_list_assn F V (t#ts) (u#us) = term_assn F V t u * term_list_assn F V ts us"
+| "term_list_assn F V _ _ = false"
+print_theorems             
+find_theorems list_all2
+find_theorems list_assn
+
+fun term_assn_id :: "('a,'v )term \<Rightarrow>('a,'v ) term nres" where
+  "term_assn_id t = RETURN t"
+
+lemma hn_Var[sepref_fr_rules]:
+  "hn_refine (hn_ctxt V a a') (return (Var a')) (hn_invalid V a a') (term_assn F V) (RETURN$((Var) $a))"
+  unfolding hn_refine_def
+  sorry
+
+lemma hn_Fun[sepref_fr_rules]:
+  "hn_refine 
+  (hn_ctxt F f f' * hn_ctxt (list_assn (term_assn F V)) ts ts')
+  (return (Fun f' ts'))
+  (hn_invalid F f f' * hn_ctxt (list_assn (term_assn F V)) ts ts')
+  (term_assn F V)
+  (RETURN$((Fun) $f$ts))"
+  unfolding hn_refine_def
+  sorry
+
+
+lemma pure_conj_eq: "\<up>P * \<up>Q = \<up>(P \<and> Q)"
+  by (simp add: pure_def)
+
+
+lemma term_list_assn_pure_conv : 
+  "term_list_assn (pure F) (pure V) fas fis = 
+   pure (\<langle>term_rel F V\<rangle>list_rel) fas fis"
+  unfolding pure_def list_rel_def term_rel_def
+  apply simp
+  sorry
+
+lemma term_assn_pure_conv[constraint_simps]: 
+"term_assn (pure F) (pure V) = pure (term_rel F V)"
+proof (intro ext)                                 
+  fix t ti
+  show "term_assn (pure F) (pure V) t ti = pure (term_rel F V) t ti"
+    unfolding term_rel_def  pure_def relAPP_def list_rel_def
+    apply (cases t; cases ti; simp_all)
+    subgoal for fa fas fi fis
+      sorry
+    done
+qed
+
+lemma term_assn_pure[constraint_simps] : 
+  assumes F:"is_pure F"
+  assumes V:"is_pure V"
+  shows "is_pure (term_assn F V)"
+  sorry
+
+sepref_definition term_assn_id_impl is "term_assn_id" ::
+"(term_assn nat_assn nat_assn)\<^sup>k \<rightarrow>\<^sub>a (term_assn id_assn id_assn)"
+  unfolding term_assn_id.simps term_assn.simps
+  apply sepref_dbg_keep
+  
+  
+  done
+export_code term_assn_id_impl in Haskell
+
+
+
+
+
+(*Is VAR OK*)
+definition is_var_impl_aux :: "('fc, 'vc) term \<Rightarrow> bool" where
+  "is_var_impl_aux t \<equiv> case t of Var _ \<Rightarrow> True | Fun _ _ \<Rightarrow> False"
+  
+definition is_var_nres :: "('f, 'v) term \<Rightarrow> bool nres" where
+"is_var_nres t \<equiv> RETURN (is_Var t)"
+
+lemma is_var_hnr[sepref_fr_rules]:
+  "(return o is_var_impl_aux, RETURN o is_Var) \<in> 
+   (term_assn nat_assn nat_assn)\<^sup>k \<rightarrow>\<^sub>a bool_assn"
+  unfolding is_var_impl_aux_def
+  apply (sepref_to_hoare)
+  apply (rename_tac x xi)
+  apply (case_tac x; case_tac xi; sep_auto)
+  done
+  
+sepref_definition is_var_impl is "is_var_nres" :: 
+"(term_assn nat_assn nat_assn)\<^sup>k \<rightarrow>\<^sub>a bool_assn"
+  unfolding is_var_nres_def
+  apply sepref_dbg_keep
+  done
+export_code is_var_impl in Haskell
+
+
+
+
+end

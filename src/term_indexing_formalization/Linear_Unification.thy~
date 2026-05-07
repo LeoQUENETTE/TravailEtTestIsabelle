@@ -1,7 +1,7 @@
 theory Linear_Unification
 imports
   Main
-  First_Order_Terms.Term_More
+  First_Order_Terms.Term
 begin
 
 datatype 'f symbol =

@@ -1,0 +1,16 @@
+theory Test_Isabelle_C
+imports
+  Main
+  Isabelle_C.C_Main
+  Isabelle_C.C_Lexer_Language
+  Isabelle_C.C_Command
+begin
+
+declare[[C_lexer_trace]]
+
+C \<open>
+int add(int a, int b) {
+  return a + b;
+}
+\<close>
+end

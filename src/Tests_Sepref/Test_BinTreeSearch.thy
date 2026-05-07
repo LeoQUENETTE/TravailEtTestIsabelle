@@ -18,7 +18,7 @@ datatype tree =
 sepref_register NodeC
 sepref_register Leaf Node
 type_synonym tree_ptr = "node ref option"
-
+find_theorems list_assn
 fun tree_assn :: " tree \<Rightarrow>  tree_ptr \<Rightarrow> assn" where
   "tree_assn Leaf None = emp"
 | "tree_assn (Node v l r) (Some p) =
@@ -47,12 +47,12 @@ definition tree_val_spec :: "tree \<Rightarrow> nat nres" where
   "tree_val_spec t \<equiv> case t of 
     Node v _ _ \<Rightarrow> RETURN v 
   | Leaf \<Rightarrow> SPEC (\<lambda>_. False)"
-
+  
 definition tree_val :: "tree \<Rightarrow> nat nres" where
   "tree_val t \<equiv> do {
     is_leaf \<leftarrow> tree_is_leaf t;
     if is_leaf then RETURN (0::nat)
-    else RETURN tree_val_spec
+    else  tree_val_spec t
   }"
 
 sepref_register tree_val

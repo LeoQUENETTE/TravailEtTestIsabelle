@@ -1,0 +1,150 @@
+theory Test_Tree
+imports
+  Main
+  Refine_Imperative_HOL.Sepref
+begin
+
+datatype node =
+  NodeC nat  "node ref option"  "node ref option"
+
+sepref_register NodeC
+
+datatype 'a tree =
+    Leaf
+    | Node (val: "'a") (left: "'a tree") (right: "'a tree")
+for
+  map: map
+  rel: tree_all2
+  pred: tree_all
+sepref_register Leaf
+sepref_register Node
+
+
+fun tree_assn :: "('a \<Rightarrow> 'c \<Rightarrow> assn) \<Rightarrow> 'a tree \<Rightarrow> 'c tree \<Rightarrow> assn" where 
+"tree_assn P Leaf Leaf = emp"|
+"tree_assn P (Node va la ra) (Node vc lc rc) = P va vc * tree_assn P la lc * tree_assn P ra rc" |
+"tree_assn _ _ _ = false"
+
+
+lemma tree_assn_aux_simp[simp]:
+  "tree_assn P Leaf t' = (\<up>(t'=Leaf))"
+  "tree_assn P t Leaf = (\<up>(t=Leaf))"
+  unfolding hn_ctxt_def
+  apply (cases t')
+  apply simp
+  apply simp
+  apply (cases t)
+  apply simp
+  apply simp
+  done    
+
+lemma tree_assn_simps[simp]:
+  "hn_ctxt (tree_assn P) Leaf t' = (\<up>(t'=Leaf))"
+  "hn_ctxt (tree_assn P) t Leaf = (\<up>(t=Leaf))"
+  "hn_ctxt (tree_assn P) Leaf Leaf = emp"
+  "hn_ctxt (tree_assn P) (Node va la ra) (Node vc lc rc) = hn_ctxt P va vc * hn_ctxt (tree_assn P) la lc * hn_ctxt (tree_assn P) ra rc"
+  "hn_ctxt (tree_assn P) (Node va la ra) Leaf = false"
+  "hn_ctxt (tree_assn P) Leaf (Node vc lc rc) = false"
+  unfolding hn_ctxt_def
+  apply (cases t')
+  apply simp
+  apply simp
+  apply (cases t)
+  apply simp
+  apply simp
+  apply simp_all
+  done
+
+lemmas hn_ctxt_tree = hn_ctxt_eq[of "tree_assn A" for A]
+
+lemma hn_case_tree[sepref_prep_comb_rule, sepref_comb_rules, simp]:
+  fixes p p' P
+  defines [simp]: "INVE \<equiv> hn_invalid (tree_assn P) p p'"
+  assumes FR: "\<Gamma> \<Longrightarrow>\<^sub>t hn_ctxt (tree_assn P) p p' * F"
+  assumes Rn: "p=Leaf \<Longrightarrow> hn_refine (hn_ctxt (tree_assn P) p p' * F) f1' (hn_ctxt XX1 p p' * \<Gamma>1') R f1"
+  assumes Rs: "\<And>va la ra vc lc rc. \<lbrakk> p=(Node va la ra); p'=(Node vc lc rc) \<rbrakk> \<Longrightarrow> 
+    hn_refine 
+      (hn_ctxt P va vc * hn_ctxt (tree_assn P) la lc * hn_ctxt (tree_assn P) ra rc * INVE * F) 
+      (f2' vc lc rc)
+      (hn_ctxt P1' va vc * hn_ctxt (tree_assn P2a') la lc * hn_ctxt (tree_assn P2b') ra rc * hn_ctxt XX2 p p' * \<Gamma>2')
+      R 
+      (f2 va la ra)"
+  assumes MERGE_VAL: "\<And>x x'. hn_ctxt P1' x x' \<or>\<^sub>A hn_ctxt P2a' x x' \<or>\<^sub>A hn_ctxt P2b' x x' \<Longrightarrow>\<^sub>t hn_ctxt P' x x'"
+  assumes MERGE_LEFT: "\<And>x x'. hn_ctxt (tree_assn P2a') x x' \<Longrightarrow>\<^sub>t hn_ctxt (tree_assn P') x x'"
+  assumes MERGE_RIGHT: "\<And>x x'. hn_ctxt (tree_assn P2b') x x' \<Longrightarrow>\<^sub>t hn_ctxt (tree_assn P') x x'"
+  assumes MERGE2: "\<Gamma>1' \<or>\<^sub>A \<Gamma>2' \<Longrightarrow>\<^sub>t \<Gamma>'"  
+  shows "hn_refine \<Gamma> (case_tree f1' f2' p') (hn_ctxt (tree_assn P') p p' * \<Gamma>') R (case_tree$f1$(\<lambda>\<^sub>2v l r. f2 v l r)$p)"
+  apply (rule hn_refine_cons_pre[OF FR])
+  apply extract_hnr_invalids
+  apply (cases p; cases p'; simp add: tree_assn.simps[THEN hn_ctxt_tree])
+  subgoal
+    apply (rule hn_refine_cons[OF _ Rn _ entt_refl]; assumption?)
+    apply (simp add: hn_ctxt_def)
+    apply (subst mult.commute, rule entt_fr_drop)
+    apply (rule entt_trans[OF _ MERGE2])
+    apply (simp add: ent_disjI1' ent_disjI2')
+    done
+  subgoal for va la ra vc lc rc
+    apply (rule hn_refine_cons[OF _ Rs _ entt_refl]; assumption?)
+    apply (simp add: hn_ctxt_def)
+    apply (rule entt_star_mono)
+    apply (rule entt_fr_drop)
+    apply (rule entt_star_mono)
+    apply (rule entt_star_mono)
+       apply (rule entt_trans[OF _ MERGE_VAL])
+       (*
+    apply (rule ent_disjI1')
+    apply (rule entt_refl)
+    apply (rule entt_star_mono)
+    apply (rule entt_trans[OF _ MERGE_LEFT])
+    apply (rule entt_refl)
+    apply (rule entt_trans[OF _ MERGE_RIGHT])
+    apply (rule entt_refl)
+    apply (rule entt_trans[OF _ MERGE2])
+    apply (rule ent_disjI2')
+    apply (rule entt_refl)*)
+    sorry
+  done
+
+lemma hn_Leaf[sepref_fr_rules]: 
+  "hn_refine emp (return Leaf) emp (tree_assn P) (RETURN$Leaf)"
+  unfolding hn_refine_def
+  by sep_auto
+
+
+
+lemma tree_assn_pure[constraint_rules]: 
+  assumes P: "is_pure P" 
+  shows "is_pure (tree_assn P)"
+proof -
+  from P obtain P' where P_eq: "\<And>x x'. P x x' = \<up>(P' x x')" 
+    by (rule is_pureE) blast
+
+  {
+    fix l l'
+    have "tree_assn P l l' = \<up>(tree_all2 P' l l')"
+      by (induct P\<equiv>P l l' rule: tree_assn.induct)
+         (simp_all add: P_eq)
+  } thus ?thesis by rule
+qed
+
+find_theorems list_assn
+                      
+fun tree_id :: "'a tree \<Rightarrow> 'a tree nres" where
+"tree_id t = RETURN t"
+
+sepref_register tree_id
+lemma id_tree_refine[simp]:
+  shows "hn_refine (hn_ctxt (tree_assn P) t t') (return t') (hn_ctxt (tree_assn P) t t') R (RETURN t)"
+  apply (rule hn_refine_ref) 
+  sorry
+sepref_definition tree_id_impl is "tree_id" :: 
+"(tree_assn nat_assn) \<^sup>k \<rightarrow>\<^sub>a (tree_assn nat_assn)"
+  unfolding tree_assn.simps
+  apply sepref_dbg_keep
+      apply sepref_dbg_trans_keep
+  apply sepref_dbg_trans_step_keep
+  
+  done
+
+end

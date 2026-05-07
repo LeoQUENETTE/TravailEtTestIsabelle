@@ -87,31 +87,51 @@ sepref_definition remove_impl is "uncurry remove"
 export_code remove_impl in Haskell
 
 
-definition bubble_sort :: "int list \<Rightarrow> int list nres" where
-"bubble_sort xs = do {
-  let n = length xs;
-  (_, result, _) \<leftarrow> nfoldli [0..<n-1] (\<lambda>(swapped, _, _). swapped) 
-    (\<lambda>i (swapped, arr, _). do {
-      (_, arr, _) \<leftarrow> nfoldli [0..<n-i-1] (\<lambda>(_, _, _). True)
-        (\<lambda>j (_, arr, _). do {
-          if (arr ! j) > (arr ! (j+1)) then do {
-            let arr = list_update arr j (arr ! (j+1));
-            let arr = list_update arr (j+1) (arr ! j);
-            RETURN (True, arr, ())
-          } else 
-            RETURN (False, arr, ())
-        }) (False, arr, ());
-      RETURN (swapped, arr, ())
-    }) (True, xs, ());
-  
-  RETURN result
-}"
+
+definition bubble_sort_pass :: "('a :: linorder) list \<Rightarrow> 'a list nres" where
+  "bubble_sort_pass xs \<equiv> do {
+    ASSERT (length xs > 1);
+    nfoldli [0..<length xs - 1] (\<lambda>_. True)
+      (\<lambda>i xs. do {
+        ASSERT (i+1 < length xs);
+        if xs ! i > xs ! (i+1) then
+          RETURN (xs[i := xs!(i+1), i+1 := xs!i])
+        else
+          RETURN xs
+      }) xs
+  }"
+
+definition bubble_sort :: "('a :: linorder) list \<Rightarrow> 'a list nres" where
+  "bubble_sort xs \<equiv> do {
+    ASSERT (length xs > 1);
+    let n = length xs;
+    (_, xs) \<leftarrow> WHILE\<^sub>T (\<lambda>(i, xs). i < n)
+      (\<lambda>(i, xs). do {
+        ASSERT (length xs > 1);
+        xs' \<leftarrow> bubble_sort_pass xs;
+        ASSERT (length xs' > 1);
+        if xs' = xs then RETURN (n, xs')  
+        else RETURN (i+1, xs')
+      }) (0, xs);
+    RETURN xs
+  }"
+lemma array_assn_keep_merge[sepref_frame_merge_rules]:
+  "hn_ctxt (array_assn A) x xi \<or>\<^sub>A hn_ctxt (array_assn A) x xi \<Longrightarrow>\<^sub>t hn_ctxt (array_assn A) x xi"
+  by (simp add: entt_disjI1')
+lemma array_assn_keep_rule[sepref_frame_match_rules]:
+  "hn_ctxt (array_assn A) x xi \<Longrightarrow>\<^sub>t hn_ctxt (array_assn A) x xi"
+  by simp
 sepref_definition bubble_sort_impl is "bubble_sort" 
-::"(array_assn int_assn)\<^sup>d \<rightarrow>\<^sub>a array_assn int_assn"
+::"(array_assn int_assn)\<^sup>k \<rightarrow>\<^sub>a array_assn int_assn"
   unfolding bubble_sort_def[abs_def]
-  unfolding list_update_def[abs_def]
+  unfolding bubble_sort_pass_def[abs_def]
+  apply (auto simp: rdomp_def array_assn_def)
+
   apply sepref_dbg_keep
-  apply sepref                              
+      supply [[goals_limit = 1]]
+      apply sepref_dbg_trans_keep
+               apply sepref_dbg_trans_step_keep
+  apply (sepref_dbg_side_keep)
   done
 
 end

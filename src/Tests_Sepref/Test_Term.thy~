@@ -4,36 +4,11 @@ theory Test_Term
     First_Order_Terms.Term
     Refine_Imperative_HOL.Sepref
     Refine_Imperative_HOL.IICF
+   
 
 begin
 
-lemma size_mem_le: "x \<in> set ts \<Longrightarrow> size x \<le> size_list size ts"
-  apply (induct ts)
-   apply auto
-  done
-function sizeTerm :: "('a, 'b) term \<Rightarrow> nat" where
-  "sizeTerm (Var x) = 1"
-| "sizeTerm (Fun f ts) = 1 + sum_list (map sizeTerm ts)"
-  by pat_completeness auto
-  termination
-  apply (relation "measure size")
-  apply auto
-    apply (simp add: less_Suc_eq_le member_le_sum_list)
-    apply (simp add: less_Suc_eq_le size_mem_le)
-  done
 
-lemma sizeTerm_positive: "sizeTerm t \<ge> 1"
-apply (induct t)
- apply (auto simp add: sizeTerm.simps)
-  done
-
-value "sizeTerm (Fun a [Fun b [Var {5}]] :: (nat,nat set) term)"
-value "sizeTerm ((Fun 5 [Var 5])  :: (nat, nat) term)"
-
-lemma size_mem_add:
-  "x \<in> set ts \<Longrightarrow> xa \<in> set us \<Longrightarrow> 
-   size x + size xa \<le> size_list size ts + size_list size us"
-  using size_mem_le by (meson add_le_mono)
 
 fun term_assn :: 
   "('fa \<Rightarrow> 'fc \<Rightarrow> assn) \<Rightarrow> ('va \<Rightarrow> 'vc \<Rightarrow> assn) \<Rightarrow> ('fa, 'va) term \<Rightarrow> ('fc, 'vc) term \<Rightarrow> assn" 
@@ -101,16 +76,23 @@ proof -
   show ?thesis
   using assms
   apply (auto simp: intro!: exI)
-  
   apply (rename_tac l li)
   apply (case_tac l; case_tac li)
-  subgoal
-    apply induct_tac 
+  subgoal 
     apply (sep_auto)
-   
-    done
+    sorry
+  subgoal
+    apply (sep_auto)
+    sorry
+  subgoal
+    apply (sep_auto)
+    sorry
+  subgoal
+    apply (sep_auto)
+    sorry
+  done
 qed
-  oops
+  
 lemma term_assn_pure [safe_constraint_rules]:
   assumes 
     pA: "is_pure F" and
@@ -124,6 +106,8 @@ sepref_definition term_assn_id_impl is "term_assn_id" ::
 "(term_assn nat_assn nat_assn)\<^sup>k \<rightarrow>\<^sub>a (term_assn id_assn id_assn)"
   unfolding term_assn_id.simps
   apply sepref_dbg_keep
+  
+  
   done
 export_code term_assn_id_impl in Haskell
 
@@ -153,4 +137,8 @@ sepref_definition is_var_impl is "is_var_nres" ::
   apply sepref_dbg_keep
   done
 export_code is_var_impl in Haskell
+
+
+
+
 end
