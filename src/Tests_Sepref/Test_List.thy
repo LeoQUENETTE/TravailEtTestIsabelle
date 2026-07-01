@@ -133,5 +133,65 @@ sepref_definition bubble_sort_impl is "bubble_sort"
                apply sepref_dbg_trans_step_keep
   apply (sepref_dbg_side_keep)
   done
+  oops
 
+  
+definition is_sorted_nres :: "('a :: linorder) list \<Rightarrow> bool nres" where 
+"is_sorted_nres l = RETURN (sorted l)" 
+
+definition is_sorted_idx :: "('a :: linorder) list \<Rightarrow> bool nres" where
+  "is_sorted_idx l \<equiv> do {
+    let n = length l;
+    if n \<le> 1 then RETURN True
+    else do {
+      (_,res) \<leftarrow> WHILET
+        (\<lambda>(i, cont). i < n - 1 \<and> cont)
+        (\<lambda>(i, cont). do {
+          ASSERT (i < length l);
+          ASSERT (i + 1 < length l);
+          let a = l!i;
+          let b = l!(i+1);
+          RETURN (i+1, a \<le> b)
+        })
+        (0::nat, True);
+      RETURN res
+    }
+  }"
+
+
+lemma is_sorted_idx_refine : "(is_sorted_idx, is_sorted_nres) \<in> Id \<rightarrow> \<langle>Id\<rangle>nres_rel"
+  unfolding is_sorted_nres_def[abs_def] is_sorted_idx_def[abs_def] 
+  apply (intro fun_relI nres_relI)
+  apply simp
+  apply (refine_vcg
+  WHILET_rule[where
+    R = "measure (\<lambda>(i::nat,_). length l - i)" and
+    I = "\<lambda>(i::nat, cont::bool).
+          i \<le> length l \<and>
+          (cont = (\<forall>j < i. l!j \<le> l!(j+1)))"]; auto)
+  subgoal for la 
+    by (induct la; auto)
+  subgoal for la x y
+    apply (induct la; induct y; auto)
+    apply (simp add: Suc_le_eq)
+    sorry
+  subgoal
+    
+    sorry
+  subgoal for la x 
+    apply (induct la; auto)
+    sorry
+  subgoal for la x
+    apply (induct la; auto)
+    sorry
+  done
+
+sepref_definition is_sorted_imp 
+  is "is_sorted_idx" 
+  :: "(array_assn nat_assn)\<^sup>k \<rightarrow>\<^sub>a bool_assn"
+  unfolding is_sorted_idx_def
+  by sepref
+  
+lemmas is_sorted_imp_correct = 
+  is_sorted_imp.refine[FCOMP is_sorted_idx_refine]
 end

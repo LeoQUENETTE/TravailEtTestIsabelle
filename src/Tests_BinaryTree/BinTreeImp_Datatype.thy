@@ -1,0 +1,31 @@
+theory BinTreeImp_Datatype
+imports
+Main
+BinTreeClassic
+Refine_Imperative_HOL.IICF
+begin
+
+datatype 'a btnode = Btnode 'a "'a btnode ref option" "'a btnode ref option"
+type_synonym 'a ibtree = "'a btnode ref option"
+
+
+fun btnode_encode :: "'a::heap btnode \<Rightarrow> nat"
+  where
+    "btnode_encode (Btnode v l r) = to_nat (v, l, r)"
+
+instance btnode :: (heap) heap
+  apply (rule heap_class.intro)
+   apply (rule countable_classI [of "btnode_encode"])
+  apply (elim btnode_encode.elims)
+  apply auto
+  ..
+
+fun btree_assn :: "('a::heap) bin_tree \<Rightarrow> 'a ibtree \<Rightarrow> assn" where
+  "btree_assn Leaf None = emp" |
+  "btree_assn (BinTreeClassic.Node v l r) (Some p) =
+     (\<exists>\<^sub>A lp rp.
+        p \<mapsto>\<^sub>r Btnode v lp rp
+      * btree_assn l lp
+      * btree_assn r rp)" |
+   "btree_assn _ _  = false"
+end

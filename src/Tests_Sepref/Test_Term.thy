@@ -3,9 +3,6 @@ theory Test_Term
     Main
     First_Order_Terms.Term
     Refine_Imperative_HOL.Sepref
-    Refine_Imperative_HOL.IICF
-   
-
 begin
 
 
@@ -23,6 +20,12 @@ where
 | "term_list_relp F V (t#ts) (t'#ts')     \<longleftrightarrow> term_relp F V t t' \<and> term_list_relp F V ts ts'"
 | "term_list_relp F V _       _            \<longleftrightarrow> False"
 
+definition term_rel :: 
+  "('fa \<times> 'fc) set \<Rightarrow> ('va \<times> 'vc) set \<Rightarrow> 
+   (('fa,'va) term \<times> ('fc,'vc) term) set"
+where
+  "term_rel F V \<equiv> {(t, t'). term_relp (\<lambda>x y. (x,y) \<in> F) (\<lambda>x y. (x,y) \<in> V) t t'}"
+definition "term_assn_id (t:: ('f, 'v) term) \<equiv> RETURN t"
 
 fun term_assn :: 
   "('fa \<Rightarrow> 'fc \<Rightarrow> assn) \<Rightarrow> ('va \<Rightarrow> 'vc \<Rightarrow> assn) \<Rightarrow> ('fa, 'va) term \<Rightarrow> ('fc, 'vc) term \<Rightarrow> assn" 
@@ -35,14 +38,10 @@ where
 | "term_list_assn F V [] [] = emp"
 | "term_list_assn F V (t#ts) (u#us) = term_assn F V t u * term_list_assn F V ts us"
 | "term_list_assn F V _ _ = false"
+print_theorems       
 
-
-                  
 find_theorems list_all2
 find_theorems list_assn
-
-fun term_assn_id :: "('a,'v )term \<Rightarrow>('a,'v ) term nres" where
-  "term_assn_id t = RETURN t"
 
 lemma hn_Var[sepref_fr_rules]:
   "hn_refine (hn_ctxt V a a') (return (Var a')) (hn_invalid V a a') (term_assn F V) (RETURN$((Var) $a))"
@@ -57,29 +56,34 @@ lemma hn_Fun[sepref_fr_rules]:
   (term_assn F V)
   (RETURN$((Fun) $f$ts))"
   unfolding hn_refine_def
+  sorryunifiable_nres
+
+lemma term_assn_list_assn_pure:
+  "(term_assn (\<lambda>a c. \<up>((c,a) \<in> F)) (\<lambda>a c. \<up>((c,a) \<in> V)) t ti = 
+    \<up>(term_relp (\<lambda>x y. (x,y) \<in> F) (\<lambda>x y. (x,y) \<in> V) ti t))
+  \<and>
+  (\<forall>fis. term_list_assn (\<lambda>a c. \<up>((c,a) \<in> F)) (\<lambda>a c. \<up>((c,a) \<in> V)) fas fis =
+    \<up>(term_list_relp (\<lambda>x y. (x,y) \<in> F) (\<lambda>x y. (x,y) \<in> V) fis fas))"
   sorry
 
-lemma term_assn_pure_conv[constraint_simps]: "term_assn (pure F) (pure V) = pure (\<langle>F\<rangle>\<langle>V\<rangle>term_rel)"
-  sorry
-
-lemma term_assn_pure[constraint_simps] : 
-  assumes F:"is_pure F"
-  assumes V:"is_pure V"
-  shows "is_pure (term_assn F V)"
-  sorry
+lemma term_assn_pure_conv[constraint_simps]: 
+"term_assn (pure F) (pure V) = pure (term_rel F V)"
+proof (intro ext)                                 
+  fix ta ti
+  show "term_assn (pure F) (pure V) ta ti = pure (term_rel F V) ta ti"
+    unfolding term_rel_def  pure_def relAPP_def list_rel_def term_list_relp.simps
+    apply (cases ta; cases ti; simp_all)
+    subgoal for a as c cs
+      by (simp add: star_aci(2) term_assn_list_assn_pure)
+    done
+qed
 
 sepref_definition term_assn_id_impl is "term_assn_id" ::
 "(term_assn nat_assn nat_assn)\<^sup>k \<rightarrow>\<^sub>a (term_assn id_assn id_assn)"
-  unfolding term_assn_id.simps term_assn.simps
+  unfolding term_assn_id_def term_assn.simps
   apply sepref_dbg_keep
-  
-  
   done
 export_code term_assn_id_impl in Haskell
-
-
-
-
 
 (*Is VAR OK*)
 definition is_var_impl_aux :: "('fc, 'vc) term \<Rightarrow> bool" where
@@ -104,7 +108,49 @@ sepref_definition is_var_impl is "is_var_nres" ::
   done
 export_code is_var_impl in Haskell
 
+fun unifiable :: "('f,'v) term \<Rightarrow> ('f,'v) term \<Rightarrow> bool"
+  and list_unifiable :: "('f,'v) term list \<Rightarrow> ('f,'v) term list \<Rightarrow> bool" where
+  "unifiable (Var x) (Var y) = (x = y)"
+| "unifiable (Var x) t = True"
+| "unifiable t (Var y) = True"
+| "unifiable (Fun f ts) (Fun g us) = (f = g \<and> list_unifiable ts us)"
+| "list_unifiable [] [] = True"
+| "list_unifiable (t#ts) (u#us) = (unifiable t u \<and> list_unifiable ts us)"
+| "list_unifiable _ _ = False"
 
+definition "unifiable_nres t1 t2 \<equiv>  RETURN (unifiable t1 t2)"
+
+find_theorems list_assn
+
+lemma term_list_assn_aux_len: 
+"term_list_assn F V t t' = term_list_assn F V t t' * \<up>(length t = length t')"
+  apply (cases t; cases t'; sep_auto)
+  subgoal for a as b bs
+    sorry
+  done
+lemma hn_term_unification[sepref_fr_rules] :
+  "hn_refine 
+   (hn_ctxt (term_assn id_assn id_assn) b bi * hn_ctxt (term_assn id_assn id_assn) a ai)
+   (return (unifiable a b)) 
+   (hn_invalid (term_assn id_assn id_assn) b bi * hn_invalid (term_assn id_assn id_assn) a ai) 
+   (bool_assn)
+   (RETURN$((unifiable)$a$b))"
+  apply rule
+  apply (sep_auto simp: hn_ctxt_def)
+  apply (cases b; cases bi; cases a; cases ai; simp_all add: invalid_assn_def)
+  
+  sorry
+  oops
+
+
+sepref_definition term_unification_impl is "uncurry unifiable_nres" ::
+  "(term_assn id_assn id_assn)\<^sup>k *\<^sub>a (term_assn id_assn id_assn)\<^sup>k \<rightarrow>\<^sub>a bool_assn"
+  unfolding unifiable_nres_def
+  apply sepref_dbg_keep
+     apply sepref_dbg_trans_keep
+     apply sepref_dbg_trans_step_keep
+  sorry
+  
 
 
 end

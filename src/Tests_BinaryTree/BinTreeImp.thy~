@@ -1,0 +1,105 @@
+theory BinTreeImp_Fun
+imports 
+Main
+BinTreeClassic
+BinTree_Imp_Datatype
+begin
+
+partial_function (heap) isin\<^sub>i :: "'a::{heap, linorder} btnode ref \<Rightarrow> 'a \<Rightarrow> bool Heap" where 
+"isin\<^sub>i p x = do {
+  node \<leftarrow> !p;
+  (case node of
+     Btnode v lp rp \<Rightarrow> 
+       if v = x then return True
+       else if x < v then 
+         (case lp of
+            None    => return False
+          | Some lp' => isin\<^sub>i lp' x)
+       else 
+         (case rp of
+            None    => return False
+          | Some rp' => isin\<^sub>i rp' x)
+  )
+}"
+
+lemma [code]:
+"isin\<^sub>i p x =
+!p \<bind>
+(\<lambda>node.
+    case node of
+      Btnode v lp rp \<Rightarrow>
+        if v = x then return True 
+        else if v > x then do {
+          case lp of
+            None \<Rightarrow>  return False |
+            Some (lp') \<Rightarrow> isin\<^sub>i lp' v
+        }
+        else do {
+          case rp of
+            None \<Rightarrow>  return False |
+            Some (rp') \<Rightarrow> isin\<^sub>i rp' v
+        })
+"
+  sorry
+
+
+partial_function (heap) insert\<^sub>i :: "'a::{heap, linorder} btnode ref option \<Rightarrow> 'a \<Rightarrow> 'a btnode ref option Heap" where 
+"insert\<^sub>i o' x = (case o' of 
+  None \<Rightarrow> do {
+    p \<leftarrow> ref (Btnode x None None); 
+    return (Some p)
+  }|
+  (Some p) \<Rightarrow> do {
+    node \<leftarrow> !p; 
+    (case node of 
+      (Btnode v lp rp) \<Rightarrow> do {
+        if x = v then return (Some p)
+        else if x < v then do {
+          lp' \<leftarrow> insert\<^sub>i lp x;
+          p := Btnode v lp' rp;
+          return (Some p)
+        }
+        else do {
+          rp' \<leftarrow> insert\<^sub>i rp x;
+          p := Btnode v lp rp';
+          return (Some p)
+        } 
+      }
+    )
+  } 
+)"
+
+lemma [code]:"
+insert\<^sub>i o' x = 
+  (case o' of
+    None \<Rightarrow> ref (Btnode x None None) \<bind> (\<lambda>p. return (Some p)) |
+    (Some p) \<Rightarrow> !p \<bind> (\<lambda>node. (case node of 
+      (Btnode v lp rp) \<Rightarrow> 
+        if x =v then return (Some p)
+        else if x < v then insert\<^sub>i lp x \<bind> (\<lambda>lp'. p:=Btnode v lp' rp \<bind>(\<lambda>_. return (Some p)))
+        else insert\<^sub>i rp x \<bind> (\<lambda>rp'. p:= Btnode v lp rp' \<bind> (\<lambda>_. return (Some p)))
+    )) 
+  )"
+  sorry
+partial_function (heap) insert_list\<^sub>i :: 
+    "'a::{heap, linorder} btnode ref option \<Rightarrow> 'a list \<Rightarrow> 'a btnode ref option Heap" 
+where 
+"insert_list\<^sub>i o' l = (case l of
+  [] \<Rightarrow> return o'
+| x#xs \<Rightarrow> do {
+    o'' \<leftarrow> insert\<^sub>i o' x;
+    insert_list\<^sub>i o'' xs
+  }
+)"
+lemma [code]:
+"insert_list\<^sub>i o' l = (case l of 
+  [] \<Rightarrow> return o' |
+  (x#xs) \<Rightarrow> insert\<^sub>i o' x \<bind> (\<lambda>o''. insert_list\<^sub>i o'' xs)
+)"
+  by (simp add: insert_list\<^sub>i.simps)
+
+export_code insert\<^sub>i insert_list\<^sub>i isin\<^sub>i checking SML Scala
+export_code insert\<^sub>i insert_list\<^sub>i isin\<^sub>i in SML module_name BPlusTree
+export_code insert\<^sub>i insert_list\<^sub>i isin\<^sub>i in Scala module_name BPlusTree
+
+end

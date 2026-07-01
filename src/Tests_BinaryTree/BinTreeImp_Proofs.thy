@@ -1,0 +1,182 @@
+theory BinTreeImp_Proofs
+imports
+Main
+BinTreeImp_Fun
+begin
+
+
+lemma btree_assn_decomp1 : 
+  assumes "lp = None"
+  assumes "rp = None" (*without it, it fails (\<degree>_\<degree>) *)
+  shows "p \<mapsto>\<^sub>r Btnode x None None \<Longrightarrow>\<^sub>A
+          p \<mapsto>\<^sub>r Btnode x lp rp * btree_assn .. lp *
+          btree_assn .. rp"
+  using assms
+  by (cases lp; cases rp; sep_auto)
+
+(*
+lemma btree_assn_decomp2 : 
+  shows "p \<mapsto>\<^sub>r Btnode x None None \<Longrightarrow>\<^sub>A p \<mapsto>\<^sub>r Btnode x None None * btree_assn .. lp * btree_assn .. rp"
+  by auto
+*)
+lemma to_set_equiv : "
+  <btree_assn t p>
+  to_set\<^sub>i p
+  <\<lambda>r. btree_assn t p *  \<up>(r = to_set t)>"
+proof (induction t arbitrary: p)
+  case Leaf
+  then show ?case
+    apply (subst to_set\<^sub>i.simps)
+    using btree_assn.simps
+    by (cases p; sep_auto)
+next
+  case (Node v l r)
+  then show ?case 
+    using btree_assn.simps
+    by (subst to_set\<^sub>i.simps)
+     (sep_auto 
+      heap: Node.IH(1) Node.IH(2))
+qed
+
+lemma to_list_equiv : "
+  <btree_assn t p>
+  to_list\<^sub>i p
+  <\<lambda>r. btree_assn t p * \<up>(r = to_list t)>
+"
+proof (induction t arbitrary: p)
+  case Leaf
+  then show ?case 
+    apply (subst to_list\<^sub>i.simps)
+    using btree_assn.simps
+    by (cases p; sep_auto)
+next
+  case (Node v l r)
+  then show ?case 
+    using btree_assn.simps
+    by (subst to_list\<^sub>i.simps)
+     (sep_auto 
+      heap: Node.IH(1) Node.IH(2))
+qed
+
+lemma isin_equiv:"
+  <btree_assn t p>
+    isin\<^sub>i p x
+  <\<lambda>r. btree_assn t p * \<up>(r = bst_is_present t x)>"
+proof -
+  show ?thesis
+    proof (induction t arbitrary: p)
+      case Leaf
+      then show ?case 
+        by  (subst isin\<^sub>i.simps;cases p; sep_auto)
+    next
+      case (Node v l r)
+      then show ?case
+        using btree_assn.simps
+        by (subst isin\<^sub>i.simps)
+          (sep_auto heap : Node.IH(1) Node.IH(2))
+    qed
+  qed
+
+lemma insert_leaf_equiv :
+shows "<emp> 
+  insert\<^sub>i None x 
+  <\<lambda>result. (xa \<mapsto>\<^sub>r result * btree_assn (insert .. x) result)>"
+proof -
+
+  have "btree_assn (bin_tree.Node x .. ..) (Some p)   \<noteq> emp" 
+    using btree_assn.simps 
+    
+    sorry
+  show ?thesis
+    using btree_assn.simps
+    apply (subst insert\<^sub>i.simps; simp)
+    
+    sorry
+qed
+lemma insert_l_equiv :
+assumes "x < v"
+and "\<And>ti. <btree_assn l ti> insert\<^sub>i ti x <btree_assn (BinTreeClassic.insert l x)>"
+shows "<xa \<mapsto>\<^sub>r Btnode v lp rp * btree_assn l lp * btree_assn r rp> 
+  insert\<^sub>i lp x 
+  <\<lambda>result. (xa \<mapsto>\<^sub>r Btnode v result rp * btree_assn (insert l x) result * btree_assn r rp)>"
+proof (cases lp)
+  case None
+  then show ?thesis 
+    using assms(1)
+  proof (subst insert\<^sub>i.simps; sep_auto)
+    show "\<And>xb. lp = None \<Longrightarrow>
+          x < v \<Longrightarrow>
+          xb \<mapsto>\<^sub>r Btnode x None None * xa \<mapsto>\<^sub>r Btnode v None rp * btree_assn l None *
+          btree_assn r rp \<Longrightarrow>\<^sub>A
+          xa \<mapsto>\<^sub>r Btnode v (Some xb) rp * btree_assn (BinTreeClassic.insert l x) (Some xb) *
+          btree_assn r rp"
+      using assms
+      
+      sorry
+qed
+next
+  case (Some p)
+  then show ?thesis
+    
+    sorry
+qed
+  
+lemma insert_equiv : "
+  <btree_assn t ti>
+    insert\<^sub>i ti x
+  <\<lambda>r. btree_assn (insert t x) (r)>
+"
+
+proof (induction t arbitrary: ti)
+  case Leaf
+  then show ?case 
+  proof (cases ti)
+    case None
+    then show ?thesis
+    proof (subst insert\<^sub>i.simps; sep_auto)
+      show "\<And>xa. ti = None \<Longrightarrow>
+          xa \<mapsto>\<^sub>r Btnode x None None \<Longrightarrow>\<^sub>A
+          xa \<mapsto>\<^sub>r Btnode x ((\<lambda>x. None) xa) ((\<lambda>x. None) xa) * btree_assn .. ((\<lambda>x. None) xa) *
+          btree_assn .. ((\<lambda>x. None) xa)"
+        by simp
+    qed
+  next
+    case (Some a)
+    then show ?thesis 
+      by auto
+  qed
+next
+  case (Node v l r)
+  consider "x = v" | "x > v" | "x < v" by fastforce
+  then show ?case
+  proof (cases)
+    case 1
+    then show ?thesis 
+      by (subst insert\<^sub>i.simps; sep_auto)
+  next
+    case 2
+    then show ?thesis
+      using Node.IH(2)
+      apply (subst insert\<^sub>i.simps)
+      sorry
+  next
+    case 3
+    then show ?thesis 
+    proof (subst insert\<^sub>i.simps; sep_auto) 
+      show "\<And>xa lp rp.
+       x < v \<Longrightarrow>
+       ti = Some xa \<Longrightarrow>
+       x \<noteq> v \<Longrightarrow>
+       <xa \<mapsto>\<^sub>r Btnode v lp rp * btree_assn l lp * btree_assn r rp> 
+        insert\<^sub>i lp x 
+       <(\<lambda> xa lp rp. (\<lambda>result. (xa \<mapsto>\<^sub>r Btnode v result rp * btree_assn (insert l x) lp * btree_assn r rp))) xa  lp rp>"
+        using Node.IH(1)
+        apply (subst insert\<^sub>i.simps; sep_auto)
+        sledgehammer
+        
+  
+  qed
+    
+qed
+
+end

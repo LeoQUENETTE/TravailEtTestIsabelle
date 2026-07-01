@@ -1,17 +1,20 @@
 theory Test_Addition
 imports 
-  Main
   Refine_Imperative_HOL.Sepref
+  Refine_Imperative_HOL.IICF
 begin
 
-definition addition :: "nat \<Rightarrow> nat \<Rightarrow> nat nres"  where
-"addition x y = RETURN (x +y)"
+definition addition :: "nat \<Rightarrow> nat \<Rightarrow> nat " where
+"addition x y = x + y"
+
+definition addition_nres :: "nat \<Rightarrow> nat \<Rightarrow> nat nres"  where
+"addition_nres x y = RETURN (x +y)"
 
 value "addition 5 3"
 
-sepref_definition addition_impl is "uncurry addition" ::
+sepref_definition addition_impl is "uncurry addition_nres" ::
 "(nat_assn\<^sup>d *\<^sub>a nat_assn\<^sup>d) \<rightarrow>\<^sub>a nat_assn"
-  unfolding addition_def
+  unfolding addition_nres_def
   apply sepref_dbg_keep
   done
 
@@ -46,4 +49,6 @@ sepref_definition addition_impl_while is
   done
 
 export_code addition_impl_while in Haskell
+
+
 end
