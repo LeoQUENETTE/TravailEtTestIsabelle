@@ -48,10 +48,12 @@ fun to_set where
 "to_set Leaf = {}"|
 "to_set (Node v l  r) = {v} \<union> to_set l \<union> to_set r"
 
+
+
 fun bst_invariant :: "'v::linorder bin_tree \<Rightarrow> bool" where
-  "bst_invariant Leaf = False"
+  "bst_invariant Leaf = True"
 | "bst_invariant (Node v l r) =
-      ((bst_invariant l \<or> l = Leaf) \<and> (bst_invariant r \<or> r = Leaf)
+      ((bst_invariant l) \<and> (bst_invariant r)
        \<and> (\<forall>x\<in>to_set l. x < v)
        \<and> (\<forall>x\<in>to_set r. v < x)
 )"
@@ -101,28 +103,32 @@ fun search_node :: "('v::linorder) bin_tree \<Rightarrow> 'v  \<Rightarrow>'v bi
 "search_node (Node v l r) x = 
   (if x = v then (Node v l r) else (if x < v then search_node l x else search_node r x))"
 
-fun search_max_node :: "'v bin_tree \<Rightarrow> 'v" where
-"search_max_node Leaf = undefined"|
-"search_max_node (Node v l Leaf) = v"|
-"search_max_node (Node v l r) = search_max_node r"
+fun search_max :: "'v bin_tree \<Rightarrow> 'v" where
+"search_max Leaf = undefined"|
+"search_max (Node v l Leaf) = v"|
+"search_max (Node v l r) = search_max r"
 
-fun search_min_node :: "'v bin_tree \<Rightarrow> 'v" where
-"search_min_node Leaf = undefined" |
-"search_min_node (Node v Leaf r) = v"|
-"search_min_node (Node v l r) = search_min_node l"
+fun search_min :: "'v bin_tree \<Rightarrow> 'v" where
+"search_min Leaf = undefined" |
+"search_min (Node v Leaf r) = v"|
+"search_min (Node v l r) = search_min l"
 
 fun delete :: "('v::linorder) bin_tree \<Rightarrow> 'v \<Rightarrow> 'v bin_tree" where
-"delete Leaf x = Leaf"|
-"delete (Node v Leaf r) x = r"|
-"delete (Node v l Leaf) x = l"|
-"delete (Node v l r) x = (
-  if v = x then (
-    let lv = search_max_node l in
-    (Node lv (delete l lv) r)
-  )
-  else if v > x then (Node v (delete l x) r)
-  else (Node v l (delete r x))
-)"
+  "delete Leaf x = Leaf"
+| "delete (Node v l r) x =
+    (if x = v then
+       case l of
+         Leaf \<Rightarrow> r
+       | Node _ _ _ \<Rightarrow>
+           (case r of
+              Leaf \<Rightarrow> l
+            | Node _ _ _ \<Rightarrow>
+                let lv = search_max l
+                in Node lv (delete l lv) r)
+     else if x < v then
+       Node v (delete l x) r
+     else
+       Node v l (delete r x))"
 
 
 end

@@ -1,0 +1,15 @@
+theory Test
+  imports Main
+begin 
+
+fun append :: "'a list \<Rightarrow> 'a \<Rightarrow> 'a list" where
+"append [] v = [v]"|
+"append (x#xs) v = x#(append xs v)"
+
+lemma "size l < size (append l v)"
+  by  (induction l arbitrary: v; auto)
+
+lemma "v \<notin> set l \<Longrightarrow> v \<in> set (append l v)"
+  by (induction l arbitrary: v; auto)
+
+end

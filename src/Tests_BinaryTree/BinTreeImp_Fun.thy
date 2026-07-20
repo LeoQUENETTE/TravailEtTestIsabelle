@@ -80,26 +80,52 @@ lemma [code]:
   )
 )"using isin\<^sub>i.simps by auto
 
+partial_function (heap) search_max\<^sub>i :: "'a::{heap, linorder} ibtree \<Rightarrow> 'a Heap" where
+"search_max\<^sub>i o' = (case o' of 
+  None \<Rightarrow> return undefined
+| Some p \<Rightarrow> do {
+    node \<leftarrow> !p; 
+    (case node of 
+      (Btnode v lp rp) \<Rightarrow> do {
+        case rp of 
+          None \<Rightarrow> return v | 
+          Some yr \<Rightarrow> search_max\<^sub>i rp
+      }
+    )
+ })"
+
+lemma  [code] :
+"search_max\<^sub>i o' = (case o' of 
+  None \<Rightarrow> return undefined |
+  Some p \<Rightarrow> !p \<bind> (\<lambda>node. 
+    (case node of (Btnode v lp rp) \<Rightarrow> 
+      (case rp of 
+        None \<Rightarrow> return v | 
+        Some _ \<Rightarrow> search_max\<^sub>i rp
+      )
+    )
+  )
+)" using search_max\<^sub>i.simps by auto
 
 partial_function (heap) insert\<^sub>i :: "'a::{heap, linorder} ibtree \<Rightarrow> 'a \<Rightarrow> 'a btnode ref option Heap" where 
 "insert\<^sub>i o' x = (case o' of 
   None \<Rightarrow> do {
     p \<leftarrow> ref (Btnode x None None); 
     return (Some p)
-  }|
-  (Some p) \<Rightarrow> do {
+  }
+| Some p \<Rightarrow> do {
     node \<leftarrow> !p; 
     (case node of 
-      (Btnode v lp rp) \<Rightarrow> do {
-        if x = v then return (Some p)
-        else if x < v then do {
+      (Btnode vp lp rp) \<Rightarrow> do {
+        if x = vp then return (Some p)
+        else if x < vp then do {
           lp' \<leftarrow> insert\<^sub>i lp x;
-          p := Btnode v lp' rp;
+          p := Btnode vp lp' rp;
           return (Some p)
         }
         else do {
           rp' \<leftarrow> insert\<^sub>i rp x;
-          p := Btnode v lp rp';
+          p := Btnode vp lp rp';
           return (Some p)
         } 
       }
@@ -112,10 +138,10 @@ insert\<^sub>i o' x =
   (case o' of
     None \<Rightarrow> ref (Btnode x None None) \<bind> (\<lambda>p. return (Some p)) |
     (Some p) \<Rightarrow> !p \<bind> (\<lambda>node. (case node of 
-      (Btnode v lp rp) \<Rightarrow> 
-        if x =v then return (Some p)
-        else if x < v then insert\<^sub>i lp x \<bind> (\<lambda>lp'. p:=Btnode v lp' rp \<bind>(\<lambda>_. return (Some p)))
-        else insert\<^sub>i rp x \<bind> (\<lambda>rp'. p:= Btnode v lp rp' \<bind> (\<lambda>_. return (Some p)))
+      (Btnode vp lp rp) \<Rightarrow> 
+        if x = vp then return (Some p)
+        else if x < vp then insert\<^sub>i lp x \<bind> (\<lambda>lp'. p:=Btnode vp lp' rp \<bind>(\<lambda>_. return (Some p)))
+        else insert\<^sub>i rp x \<bind> (\<lambda>rp'. p:= Btnode vp lp rp' \<bind> (\<lambda>_. return (Some p)))
     )) 
   )"
   using insert\<^sub>i.simps by auto
@@ -136,38 +162,62 @@ lemma [code]:
 )"
   by (simp add: insert_list\<^sub>i.simps)
 
-(*TODO error to fix*)
-partial_function (heap) delete\<^sub>i ::"'a::{heap, linorder} ibtree \<Rightarrow> 'a \<Rightarrow> 'a ibtree Heap" where
+partial_function (heap) delete\<^sub>i :: "'a::{heap, linorder} ibtree \<Rightarrow> 'a \<Rightarrow> 'a ibtree Heap" where
 "delete\<^sub>i o' x = (
-  case o' of 
-    None \<Rightarrow> return None|
-    Some p \<Rightarrow> do {
+  case o' of None \<Rightarrow> return None
+  | Some p \<Rightarrow> do {
       node \<leftarrow> !p;
-      (case node of 
-        (Btnode v lp rp) \<Rightarrow> (
-          if v = x then do {
-            list_rp \<leftarrow> to_list\<^sub>i rp;
-            lp' \<leftarrow> insert_list\<^sub>i lp list_rp;
-            p := lp';
+      (case node of Btnode v lp rp \<Rightarrow>
+        if x = v then do {
+          if lp = None then return rp
+          else if rp = None then return lp
+          else do {
+            lp_max \<leftarrow> search_max\<^sub>i lp;
+            lp' \<leftarrow> delete\<^sub>i lp lp_max;
+            p := Btnode lp_max lp' rp;
             return (Some p)
           }
-          else if v < x then do {
-            rp' \<leftarrow> delete\<^sub>i rp x;
-            p := Btnode v lp rp';
-            return (Some p)
-          }
-           else do {
-            lp' \<leftarrow> delete\<^sub>i lp x;
-            p := Btnode v lp' rp;
-            return (Some p)
-          }
-        )
+        }
+        else if x < v then do {
+          lp' \<leftarrow> delete\<^sub>i lp x;
+          p := Btnode v lp' rp;
+          return (Some p)
+        }
+        else do {
+          rp' \<leftarrow> delete\<^sub>i rp x;
+          p := Btnode v lp rp';
+          return (Some p)
+        }
       )
     }
 )"
 
-export_code insert\<^sub>i to_set\<^sub>i to_list\<^sub>i insert_list\<^sub>i isin\<^sub>i checking SML Scala
-export_code insert\<^sub>i to_set\<^sub>i to_list\<^sub>i insert_list\<^sub>i isin\<^sub>i in SML module_name BPlusTree
-export_code insert\<^sub>i to_set\<^sub>i to_list\<^sub>i insert_list\<^sub>i isin\<^sub>i in Scala module_name BPlusTree
+lemma [code]:
+"delete\<^sub>i o' x = (case o' of 
+    None \<Rightarrow> return None |
+    Some p \<Rightarrow> !p \<bind> (\<lambda>node. 
+      (case node of Btnode v lp rp \<Rightarrow>
+        if x = v then
+          if lp = None then return rp
+          else if rp = None then return lp
+          else 
+            search_max\<^sub>i lp \<bind> (\<lambda>lp_max.
+            delete\<^sub>i lp lp_max \<bind> (\<lambda>lp'.
+            p := Btnode lp_max lp' rp \<bind> (\<lambda>_.
+            return (Some p))))
+        else if x < v then 
+          delete\<^sub>i lp x \<bind> (\<lambda>lp'.
+          p := Btnode v lp' rp \<bind> (\<lambda>_.
+          return (Some p)))
+        else 
+          delete\<^sub>i rp x \<bind> (\<lambda>rp'.
+          p := Btnode v lp rp' \<bind> (\<lambda>_.
+          return (Some p)))
+      )
+))" using delete\<^sub>i.simps by auto
+
+export_code delete\<^sub>i insert\<^sub>i to_set\<^sub>i to_list\<^sub>i insert_list\<^sub>i isin\<^sub>i checking SML Scala
+export_code delete\<^sub>i insert\<^sub>i to_set\<^sub>i to_list\<^sub>i insert_list\<^sub>i isin\<^sub>i in SML module_name BPlusTree
+export_code delete\<^sub>i insert\<^sub>i to_set\<^sub>i to_list\<^sub>i insert_list\<^sub>i isin\<^sub>i in Scala module_name BPlusTree
 
 end

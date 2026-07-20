@@ -48,10 +48,12 @@ fun to_set where
 "to_set Leaf = {}"|
 "to_set (Node v l  r) = {v} \<union> to_set l \<union> to_set r"
 
+
+
 fun bst_invariant :: "'v::linorder bin_tree \<Rightarrow> bool" where
-  "bst_invariant Leaf = False"
+  "bst_invariant Leaf = True"
 | "bst_invariant (Node v l r) =
-      ((bst_invariant l \<or> l = Leaf) \<and> (bst_invariant r \<or> r = Leaf)
+      ((bst_invariant l) \<and> (bst_invariant r)
        \<and> (\<forall>x\<in>to_set l. x < v)
        \<and> (\<forall>x\<in>to_set r. v < x)
 )"
@@ -112,17 +114,19 @@ fun search_min :: "'v bin_tree \<Rightarrow> 'v" where
 "search_min (Node v l r) = search_min l"
 
 fun delete :: "('v::linorder) bin_tree \<Rightarrow> 'v \<Rightarrow> 'v bin_tree" where
-"delete Leaf x = Leaf"|
-"delete (Node v Leaf r) x = r"|
-"delete (Node v l Leaf) x = l"|
-"delete (Node v l r) x = (
-  if v = x then (
-    let lv = search_max l in
-    (Node lv (delete l lv) r)
-  )
-  else if v > x then (Node v (delete l x) r)
-  else (Node v l (delete r x))
-)"
+  "delete Leaf x = Leaf"
+| "delete (Node v l r) x =
+    (if x = v then
+       case l of
+         Leaf \<Rightarrow> r
+       | Node _ _ _ \<Rightarrow>
+           (case r of
+              Leaf \<Rightarrow> l
+            | Node _ _ _ \<Rightarrow>  Node (search_max l) (delete l (search_max l)) r)
+     else if x < v then
+       Node v (delete l x) r
+     else
+       Node v l (delete r x))"
 
 
 end
