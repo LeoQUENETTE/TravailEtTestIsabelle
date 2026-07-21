@@ -522,7 +522,7 @@ lemma delete_subset_l:
   shows "to_set (Node v (delete l x) r) \<subseteq> to_set (Node v l r)"
   using delete_subset_core[of l x] assms
   by auto
-lemma
+lemma delete_only_one_element : 
   assumes "x \<in> to_set t"
   assumes "finite (to_set t)"
   assumes "bst_invariant t"
@@ -661,7 +661,8 @@ next
           by blast
         have inv_l: "bst_invariant l" using Node.prems(3) by auto
         have del_set: "to_set (delete l (search_max l)) = to_set l - {search_max l}"
-          sorry
+          using delete_only_one_element finite_t hl inv_l sm_in 
+          by blast
         have "to_set (Node (search_max l) (delete l (search_max l)) r) = {search_max l} \<union> to_set (delete l (search_max l)) \<union> to_set r"
           using delete.simps by auto
         also have "... = {search_max l} \<union> (to_set l - {search_max l}) \<union> to_set r"
@@ -728,5 +729,38 @@ next
   qed
 qed
 
+lemma delete_invariant:
+  assumes "finite (to_set t)"
+  assumes "bst_invariant t"
+  shows "bst_invariant (delete t x)"
+  using assms
+proof (induction t x arbitrary: x rule:delete.induct)
+  case (1 x)
+  then show ?case 
+    by auto
+next
+  case (2 v l r x)
+  consider "x = v" | "x < v" | "x > v" by fastforce
+  then show ?case 
+  proof (cases)
+    case 1
+    have "r = .. \<Longrightarrow> bst_invariant (l)"
+      by (metis bst_invariant.simps(2) "2.prems"(2))
+    have "l = .. \<Longrightarrow> bst_invariant (r)"  
+    by (metis bst_invariant.simps(2) "2.prems"(2)) 
+  have "\<And>vr lr rr vl ll rl. r = Node vr lr rr \<Longrightarrow> l = Node vl ll rl\<Longrightarrow>
+        bst_invariant (Node (search_max l) (delete l (search_max l)) r)" 
+    
+    sorry
+    then show ?thesis 
+      sorry
+  next
+    case 2
+    then show ?thesis sorry
+  next
+    case 3
+    then show ?thesis sorry
+  qed
+qed
 
 end

@@ -122,9 +122,7 @@ fun delete :: "('v::linorder) bin_tree \<Rightarrow> 'v \<Rightarrow> 'v bin_tre
        | Node _ _ _ \<Rightarrow>
            (case r of
               Leaf \<Rightarrow> l
-            | Node _ _ _ \<Rightarrow>
-                let lv = search_max l
-                in Node lv (delete l lv) r)
+            | Node _ _ _ \<Rightarrow>  Node (search_max l) (delete l (search_max l)) r)
      else if x < v then
        Node v (delete l x) r
      else
