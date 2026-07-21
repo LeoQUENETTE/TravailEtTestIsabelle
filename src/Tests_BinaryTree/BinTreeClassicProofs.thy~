@@ -297,7 +297,7 @@ lemma insert_preserves_upper:
   shows "\<forall>y\<in>to_set (insert t x). y \<le> a"
   using assms by (simp add: insert_adds)
                                                                    
-lemma inv_holds: "bst_invariant t \<or> t = Leaf \<Longrightarrow> bst_invariant (insert t (x::nat))"
+lemma inv_holds: "bst_invariant t \<Longrightarrow> bst_invariant (insert t (x::nat))"
 proof (induction t )
   case Leaf
   then show ?case by simp
@@ -447,6 +447,7 @@ lemma search_max_work:
 
 lemma search_max_subset :
   assumes "bst_invariant t"
+  and "t \<noteq> Leaf"
   shows "search_max t \<in> to_set t"
   using assms
   by (induction t rule: search_max.induct; auto)
@@ -454,113 +455,73 @@ lemma search_max_subset :
 (* ----------------------- delete ----------------------- *)
 subsection delete
 
-lemma delete_subset_core:
-  assumes "bst_invariant (Node v l r)"
-  shows "to_set (delete (Node v l r) x) \<subseteq> to_set (Node v l r)"
-  using assms search_max_subset search_max_work
-proof (cases "v = x")
-  case h : True
-  then show ?thesis
-    proof (induction l rule : to_set.induct)
-      case 1
-      then show ?case 
-        by auto
-    next
-      case (2 vl ll rl)
-      then show ?case 
-      proof (induction r rule : to_set.induct)
-        case 1
-        then show ?case by auto
-      next
-        case (2 vr lr rr)
-        then have "to_set (delete r x) \<subseteq> to_set (Node v l r)" 
-          apply auto (*xa \<in> to_set (delete r x) \<Longrightarrow> xa \<noteq> x \<Longrightarrow> xa \<notin> to_set r \<Longrightarrow> False*)
-          sorry
-        then show ?case 
-          
-          sorry
-      qed
-    qed
-next
-  case False
-  then show ?thesis sorry
-qed
+value "bst_invariant (Node (5::nat) (Node (5::nat) .. ..) ..)"
 
 lemma delete_subset_core: 
   assumes "bst_invariant t"
   shows "to_set (delete t x) \<subseteq> to_set t"
   using assms
-proof (induct t arbitrary: x)
+proof (induction t arbitrary: x)
   case Leaf
-  then show ?case by simp
+  then show ?case 
+    by auto
 next
-  case h10 : (Node v l r)
+  case (Node v l r)
   then show ?case
-  proof (cases "v = x")
-    case True
-    then show ?thesis
-    proof (cases l)
-      case Leaf
-      then show ?thesis 
-        by auto
-    next
-      case h11 :(Node vl ll rl)
-      then show ?thesis 
-      proof(cases r)
-        case Leaf
-        then show ?thesis 
-          using h10 h11 by auto
-      next
-        case h12 : (Node vr lr rr)
-        have "to_set (delete l (search_max l)) \<subseteq> to_set l" 
-          using h10.hyps(1) h10.prems by auto
-        have "Node (search_max l) (delete l (search_max l)) r = delete t x" using h10 h11 h12 True assms 
-          apply simp
-          nitpick
-          sorry
-        have "to_set (delete t x) = to_set (delete l (search_max l)) \<union> to_set(r) \<union> {search_max l}" 
-          using h10 h11 h12 
-          nitpick
-        then show ?thesis 
-          using search_max_subset
-          
-          sorry
+  proof -
+    have "to_set l \<union> to_set r \<subseteq> to_set (Node v l r)" by auto 
+    then have "l \<noteq> .. \<Longrightarrow> to_set (delete l (search_max l)) \<subseteq> to_set l"
+      by (metis bst_invariant.simps(2) Node.prems Node.IH(1))
+    then have l_node1: "x = v \<Longrightarrow> l \<noteq> ..\<Longrightarrow>to_set (Node (search_max l) (delete l (search_max l)) r)  \<subseteq> to_set (Node v l r)"
+      using Node.prems search_max_subset by auto
+    then have l_node2: "x = v \<Longrightarrow> l \<noteq> .. \<Longrightarrow> r \<noteq> .. \<Longrightarrow>to_set (Node (search_max l) (delete l (search_max l)) r) = to_set (delete (Node v l r) x)"
+      proof -
+        assume hxv: "x = v"
+        assume hl: "l \<noteq> Leaf"
+        assume hr: "r \<noteq> Leaf"
+        obtain vl ll rl where hl_eq: "l = Node vl ll rl"
+          using hl by (cases l) auto
+        obtain vr lr rr where hr_eq: "r = Node vr lr rr"
+          using hr by (cases r) auto
+        show ?thesis
+          using hxv hl_eq hr_eq
+          by (simp add: delete.simps hl_eq hr_eq) 
       qed
-        sorry
-    qed
-      
-  next
-    case False
-    then show ?thesis
-    proof (cases "v > x")
-      case True
-      then have eq: "delete (Node v l r) x = Node v (delete l x) r"
-        using \<open>v \<noteq> x\<close> by simp
-      then show ?thesis
-        using Node.hyps(1)
-        using assms(1,2) by fastforce
-    next
-      case False
-      then have eq: "delete (Node v l r) x = Node v l (delete r x)"
-        using \<open>v \<noteq> x\<close> by simp
-      then show ?thesis
-        using Node.hyps(2) assms
-        by (simp add: eq , blast)
-    qed
+    then have l_node3: "x = v \<Longrightarrow> l \<noteq> .. \<Longrightarrow> r = .. \<Longrightarrow>to_set l = to_set (delete (Node v l r) x)"
+      by (simp add: bin_tree.case_eq_if)
+    then have l_leaf:"x = v \<Longrightarrow> l = .. \<Longrightarrow> to_set (r)  = to_set (delete (Node v l r) x)"
+      by auto
+  then have "x = v \<Longrightarrow> to_set (delete (Node v l r) x)
+    \<subseteq> to_set (Node v l r)"
+    using l_node1 l_node2 l_node3 l_leaf
+    using \<open>to_set l \<union> to_set r \<subseteq> to_set (Node v l r)\<close> by blast
+  then have "to_set (Node v (delete l x) r) \<subseteq> to_set (Node v l r)"
+    using Node.IH(1) Node.prems by auto
+  then have "to_set (Node v l (delete r x)) \<subseteq> to_set (Node v l r)"
+    using Node.IH(2) Node.prems by auto
+  then have "x < v \<Longrightarrow> to_set (Node v (delete l x) r) = to_set (delete (Node v l r) x)"
+    by auto
+  then have "x > v \<Longrightarrow> to_set (Node v l (delete r x)) = to_set (delete (Node v l r) x)"
+    by (metis delete.simps(2) less_le_not_le)
+  then show ?thesis 
+    by (metis \<open>v < x \<Longrightarrow>
+      to_set (Node v l (delete r x)) = to_set (delete (Node v l r) x)\<close> \<open>to_set (Node v l (delete r x)) \<subseteq> to_set (Node v l r)\<close> \<open>x = v \<Longrightarrow>
+      to_set (delete (Node v l r) x) \<subseteq> to_set (Node v l r)\<close> \<open>to_set (Node v (delete l x) r) \<subseteq> to_set (Node v l r)\<close> delete.simps(2))
   qed
 qed
 
+
 lemma delete_subset_r:
+  assumes "bst_invariant (Node v l r)"
   shows "to_set (Node v l (delete r x)) \<subseteq> to_set (Node v l r)"
   using delete_subset_core[of r x]
-  by (smt (verit) Un_iff bin_tree.discI bin_tree.inject delete.simps(1) subsetI subset_Un_eq
-      to_set.elims)
+  using assms by auto
 
 lemma delete_subset_l:
+  assumes "bst_invariant (Node v l r)"
   shows "to_set (Node v (delete l x) r) \<subseteq> to_set (Node v l r)"
-  using delete_subset_core[of l x]
-  by (smt (verit, ccfv_threshold) Un_iff subset_iff to_set_decomp2 to_set_include to_set_include_l
-      to_set_include_r)
+  using delete_subset_core[of l x] assms
+  by auto
 
 lemma
   assumes "x\<in>to_set t"
@@ -568,7 +529,7 @@ lemma
   assumes "bst_invariant t"
   shows "x \<notin> to_set (delete t x)"
   using assms
-proof (induction t)
+proof (induction t arbitrary: x)
   case Leaf
   then show ?case 
     by auto
@@ -580,14 +541,47 @@ next
   proof (cases)
     case 1
     then show ?thesis 
-      apply (subst delete.simps ; auto) 
-      sorry
+    proof -
+      have "v = x \<Longrightarrow> l = .. \<Longrightarrow> delete (Node v l r) x = r" 
+        by auto
+      then have "v = x \<Longrightarrow> l = .. \<Longrightarrow>x \<notin> to_set (delete (Node v l r) x)" 
+        using Node.prems(3) by fastforce
+      have "\<And>vl ll rl. v = x \<Longrightarrow> r = .. \<and> l = (Node vl ll rl) \<Longrightarrow> delete (Node v l r) x = l"
+        by auto
+      then have "\<And>vl ll rl. v = x \<Longrightarrow> r = .. \<and> l = (Node vl ll rl) \<Longrightarrow> x \<notin> to_set(delete (Node v l r) x)"
+        using Node.prems(3) by fastforce
+      have "\<And>vl ll rl vr lr rr. v = x \<Longrightarrow> l = (Node vl ll rl) \<and> r = (Node vr lr rr) \<Longrightarrow> to_set (delete (Node v l r) x) = to_set(Node (search_max l) (delete l (search_max l)) r)"
+        by auto
+      then have "\<And>vl ll rl. l = (Node vl ll rl) \<Longrightarrow> to_set(Node (search_max l) (delete l (search_max l)) r) = to_set l \<union> to_set r"
+        using search_max_subset Node.prems to_set_decomp 
+        apply (cases l; simp)
+        sorry
+      then have "\<And>vl ll rl vr lr rr. v = x \<Longrightarrow> l = (Node vl ll rl) \<and> r = (Node vr lr rr) \<Longrightarrow> to_set (delete (Node v l r) x) = to_set l \<union> to_set r"
+        by auto
+      then have "\<And>vl ll rl vr lr rr. v = x \<Longrightarrow> l = (Node vl ll rl) \<and> r = (Node vr lr rr) \<Longrightarrow> x \<notin> to_set l \<union> to_set r"
+        by (metis Node.prems(3) Un_iff bst_invariant_count_l bst_invariant_count_r count_val_pos_iff_mem
+            order_less_irrefl)
+      then show ?thesis
+        by (metis "1" Node.prems(3)
+            \<open>\<And>vl rl ll. v = x \<Longrightarrow> r = .. \<and> l = Node vl ll rl \<Longrightarrow> x \<notin> to_set (delete (Node v l r) x)\<close>
+            \<open>\<And>vr vl rr rl lr ll. v = x \<Longrightarrow> l = Node vl ll rl \<and> r = Node vr lr rr \<Longrightarrow> to_set (delete (Node v l r) x) = to_set l \<union> to_set r\<close>
+            \<open>v = x \<Longrightarrow> l = .. \<Longrightarrow> delete (Node v l r) x = r\<close> bst_invariant_count_r count_val_pos_iff_mem
+            order_less_irrefl to_list.cases)
+    qed
   next
     case 2
     then show ?thesis 
-      using assms
-      apply (subst delete.simps ; auto)
-      sorry
+    proof (cases l)
+      case Leaf
+      then show ?thesis 
+        using Node.IH(2) Node.prems(1,3) not_less_iff_gr_or_eq 
+          by fastforce
+    next
+      case (Node x21 x22 x23)
+      then show ?thesis 
+        
+        sorry
+    qed
   next
     case 3
     then show ?thesis 

@@ -305,25 +305,107 @@ lemma delete_equiv:
 proof (induction t arbitrary: p x)
   case Leaf
   then show ?case
-    by (cases p; sep_auto simp: delete\<^sub>i.simps)
+  proof (cases p)
+    case None
+    then show ?thesis
+      by (subst delete\<^sub>i.simps; sep_auto)
+  next
+    case (Some q)
+    then show ?thesis
+      by auto
+  qed
 next
   case (Node v l r)
 
-  note [sep_heap_rules] = Node.IH
+  note IH_l = Node.IH(1)
+  note IH_r = Node.IH(2)
 
-  show ?case
-    apply (cases p)
-     apply simp
-    apply (cases l)
-     apply (cases r)
-      apply (sep_auto simp: delete\<^sub>i.simps)
-     apply (sep_auto simp: delete\<^sub>i.simps)
-    apply (cases r)
-     apply (sep_auto simp: delete\<^sub>i.simps)
-    apply (sep_auto
-      simp: delete\<^sub>i.simps
-      heap: search_max_equiv)
-    done
+  consider
+      (eq) "x = v"
+    | (lt) "x < v"
+    | (gt) "v < x"
+    by fastforce
+
+  then show ?case
+  proof cases
+    case eq
+
+    show ?thesis
+    proof (cases p)
+      case None
+      then show ?thesis
+        by auto
+    next
+      case (Some q)
+
+      show ?thesis
+      proof (cases l)
+        case Leaf
+
+        then show ?thesis
+          using Some eq
+          by (simp add: delete\<^sub>i.simps; sep_auto)
+      next
+        case (Node lv ll lr)
+        note l_Node = Node
+
+        show ?thesis
+        proof (cases r)
+          case Leaf
+
+          then show ?thesis
+            using Some eq l_Node
+            by (simp add: delete\<^sub>i.simps; sep_auto)
+        next
+          case (Node rv rl rr)
+          note r_Node = Node
+
+          show ?thesis
+            using Some eq l_Node r_Node
+            by (
+              simp add: delete\<^sub>i.simps;
+              sep_auto heap: search_max_equiv IH_l
+            )
+        qed
+      qed
+    qed
+  next
+    case lt
+
+    show ?thesis
+    proof (cases p)
+      case None
+      then show ?thesis
+        by auto
+    next
+      case (Some q)
+
+      then show ?thesis
+        using lt
+        by (
+          simp add: delete\<^sub>i.simps;
+          sep_auto heap: IH_l
+        )
+    qed
+  next
+    case gt
+
+    show ?thesis
+    proof (cases p)
+      case None
+      then show ?thesis
+        by auto
+    next
+      case (Some q)
+
+      then show ?thesis
+        using gt
+        by (
+          simp add: delete\<^sub>i.simps;
+          sep_auto heap: IH_r
+        )
+    qed
+  qed
 qed
 
 
