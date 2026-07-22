@@ -7,18 +7,14 @@ begin
 
 lemma btree_assn_decomp1 : 
   assumes "lp = None"
-  assumes "rp = None" (*without it, it fails (\<degree>_\<degree>) *)
+  assumes "rp = None"
   shows "p \<mapsto>\<^sub>r Btnode x None None \<Longrightarrow>\<^sub>A
           p \<mapsto>\<^sub>r Btnode x lp rp * btree_assn .. lp *
           btree_assn .. rp"
   using assms
   by (cases lp; cases rp; sep_auto)
 
-(*
-lemma btree_assn_decomp2 : 
-  shows "p \<mapsto>\<^sub>r Btnode x None None \<Longrightarrow>\<^sub>A p \<mapsto>\<^sub>r Btnode x None None * btree_assn .. lp * btree_assn .. rp"
-  by auto
-*)
+
 lemma to_set_equiv : "
   <btree_assn t p>
   to_set\<^sub>i p
@@ -72,6 +68,71 @@ next
     using btree_assn.simps
     by (subst isin\<^sub>i.simps)
       (sep_auto heap : Node.IH(1) Node.IH(2))
+qed
+lemma search_none_undefined:
+  "<emp> 
+     search\<^sub>i None x 
+   <\<lambda>res. \<up>(res = undefined)>"
+  by (subst search\<^sub>i.simps; sep_auto)
+
+lemma search_step_l: "x < v \<Longrightarrow> l = bin_tree.Node vl ll rl \<Longrightarrow> <btree_assn (bin_tree.Node v l r) p>
+    search\<^sub>i p x
+    <\<lambda>ra. btree_assn
+           (bin_tree.Node v l r) p *
+          \<up> (ra =
+             search
+              (bin_tree.Node v l r) x)>\<^sub>t"
+proof (cases p)
+  case None
+  then show ?thesis 
+    by (subst search\<^sub>i.simps; sep_auto)
+next
+  case (Some q)
+  then show ?thesis 
+  proof (induction l)
+    case Leaf
+    then show ?case
+      apply (subst search\<^sub>i.simps; sep_auto; auto)
+      sorry
+  next
+    case (Node x1 l1 l2)
+    then show ?case sorry
+  qed
+qed
+
+lemma search_equiv : "
+  <btree_assn t p> search\<^sub>i p x <\<lambda>r. btree_assn t p * \<up>(r = search t x)>\<^sub>t"
+proof (induction t x arbitrary: x rule: search.induct)
+  case (1 x)
+  show ?case
+    using btree_assn.simps
+    by (cases p; subst search\<^sub>i.simps; sep_auto)
+next
+  case (2 v l r x)
+  then show ?case 
+  proof (cases p)
+    case None
+    then show ?thesis 
+      by (subst search\<^sub>i.simps; sep_auto)
+  next
+    case (Some q)
+    consider "x = v"|"x < v"|"x > v" by fastforce
+    then show ?thesis 
+    proof (cases)
+      case 1
+      then show ?thesis 
+        by (subst search\<^sub>i.simps; sep_auto)
+    next
+      case 2
+      then show ?thesis 
+        apply (cases l; subst search\<^sub>i.simps; sep_auto; auto)
+        sledgehammer
+    next
+      case 3
+      then show ?thesis 
+        sorry
+    qed
+  qed
 qed
 
 lemma search_max_equiv: "
@@ -329,7 +390,6 @@ next
   then show ?case
   proof cases
     case eq
-
     show ?thesis
     proof (cases p)
       case None
@@ -337,35 +397,27 @@ next
         by auto
     next
       case (Some q)
-
       show ?thesis
       proof (cases l)
         case Leaf
-
         then show ?thesis
           using Some eq
           by (simp add: delete\<^sub>i.simps; sep_auto)
       next
         case (Node lv ll lr)
         note l_Node = Node
-
         show ?thesis
         proof (cases r)
           case Leaf
-
           then show ?thesis
             using Some eq l_Node
             by (simp add: delete\<^sub>i.simps; sep_auto)
         next
           case (Node rv rl rr)
           note r_Node = Node
-
           show ?thesis
             using Some eq l_Node r_Node
-            by (
-              simp add: delete\<^sub>i.simps;
-              sep_auto heap: search_max_equiv IH_l
-            )
+            by auto
         qed
       qed
     qed
@@ -389,7 +441,6 @@ next
     qed
   next
     case gt
-
     show ?thesis
     proof (cases p)
       case None
@@ -397,13 +448,9 @@ next
         by auto
     next
       case (Some q)
-
       then show ?thesis
         using gt
-        by (
-          simp add: delete\<^sub>i.simps;
-          sep_auto heap: IH_r
-        )
+        by auto
     qed
   qed
 qed

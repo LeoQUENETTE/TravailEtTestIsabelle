@@ -1,0 +1,45 @@
+theory Test
+imports Main Refine_Imperative_HOL.IICF
+begin 
+
+fun add :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
+"add 0 y = y"|
+"add (Suc x) y = Suc(add x y)"
+
+value "add 4 2"
+
+partial_function (heap) add\<^sub>i :: "nat \<Rightarrow> nat \<Rightarrow> nat Heap" where
+"add\<^sub>i x y = (case x of
+  0 \<Rightarrow> return y |
+  Suc x' \<Rightarrow> do {
+    res \<leftarrow> add\<^sub>i x' y;
+    return (Suc res)
+  }
+)"
+
+lemma [code]:
+"add\<^sub>i x y = (case x of
+  0 \<Rightarrow> return y |
+  Suc x' \<Rightarrow> 
+    add\<^sub>i x' y \<bind> (\<lambda>res.
+    return (Suc res))
+)" using add\<^sub>i.simps by auto
+
+export_code add\<^sub>i checking Scala
+export_code add\<^sub>i in Scala module_name Test
+
+lemma add\<^sub>i_rule:
+  "<emp>
+     add\<^sub>i x y
+   <\<lambda>r. \<up>(r = add x y)>"
+proof (induction x)
+  case 0
+  then show ?case
+    by (subst add\<^sub>i.simps; sep_auto)
+next
+  case (Suc x')
+  then show ?case
+    by (subst add\<^sub>i.simps; sep_auto heap: Suc.IH)
+qed
+
+end

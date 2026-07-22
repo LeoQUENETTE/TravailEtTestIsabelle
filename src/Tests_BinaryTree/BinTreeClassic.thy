@@ -97,6 +97,10 @@ fun bst_is_present :: "('v::linorder) bin_tree \<Rightarrow> 'v \<Rightarrow> bo
     )
   )"
 
+fun search :: "('v::linorder) bin_tree \<Rightarrow> 'v  \<Rightarrow>'v" where
+"search Leaf x = undefined"|
+"search (Node v l r) x = 
+  (if x = v then v else (if x < v then search l x else search r x))"
 
 fun search_node :: "('v::linorder) bin_tree \<Rightarrow> 'v  \<Rightarrow>'v bin_tree" where
 "search_node Leaf x = Leaf"|

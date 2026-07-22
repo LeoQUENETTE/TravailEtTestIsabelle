@@ -80,6 +80,27 @@ lemma [code]:
   )
 )"using isin\<^sub>i.simps by auto
 
+partial_function (heap) search\<^sub>i :: "'a::{heap, linorder} ibtree \<Rightarrow> 'a \<Rightarrow> 'a Heap" where
+"search\<^sub>i o' x = (case o' of 
+  None \<Rightarrow> return undefined
+| Some p \<Rightarrow> do {
+    node \<leftarrow> !p; 
+    (case node of 
+      (Btnode v lp rp) \<Rightarrow> do {
+        (if x = v then return v 
+        else if x < v then do {
+        v' \<leftarrow>search\<^sub>i lp x;
+        return v'
+        } 
+        else do {
+          v' \<leftarrow> search\<^sub>i rp x; 
+          return v'
+        })
+      }
+    )
+  }
+)"
+
 partial_function (heap) search_max\<^sub>i :: "'a::{heap, linorder} ibtree \<Rightarrow> 'a Heap" where
 "search_max\<^sub>i o' = (case o' of 
   None \<Rightarrow> return undefined

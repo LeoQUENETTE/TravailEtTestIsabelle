@@ -14,7 +14,33 @@ lemma btree_assn_decomp1 :
   using assms
   by (cases lp; cases rp; sep_auto)
 
+lemma none_equiv :
+shows "<emp> 
+  return None 
+  <\<lambda>r. btree_assn Leaf r>"
+  unfolding hoare_triple_def snga_assn_def one_assn_def
+  apply (auto
+    elim!: run_elims
+    simp: relH_def in_range.simps mod_emp Abs_assn_inverse
+  )
+  done
 
+partial_function (heap) leaf\<^sub>i :: "'a::{heap} \<Rightarrow> 'a btnode ref option Heap" where 
+"leaf\<^sub>i x = do {
+    p \<leftarrow> ref (Btnode x None None); 
+    return (Some p)
+  }"
+
+lemma leaf_equiv:
+shows "<emp> 
+  leaf\<^sub>i x 
+  <\<lambda>r. btree_assn (bin_tree.Node x .. ..) r>"
+
+proof -
+  have h: "\<And>xa. xa \<mapsto>\<^sub>r Btnode x None None \<Longrightarrow>\<^sub>A xa \<mapsto>\<^sub>r Btnode x ((\<lambda>x. None) xa) ((\<lambda>x. None) xa) * btree_assn .. ((\<lambda>x. None) xa) * btree_assn .. ((\<lambda>x. None) xa)"
+    by sep_auto
+  then show ?thesis by (simp add: leaf\<^sub>i.simps; sep_auto; blast)
+qed
 lemma to_set_equiv : "
   <btree_assn t p>
   to_set\<^sub>i p
@@ -68,6 +94,93 @@ next
     using btree_assn.simps
     by (subst isin\<^sub>i.simps)
       (sep_auto heap : Node.IH(1) Node.IH(2))
+qed
+lemma search_none_undefined:
+  "<emp> 
+     search\<^sub>i None x 
+   <\<lambda>res. \<up>(res = undefined)>"
+  by (subst search\<^sub>i.simps; sep_auto)
+
+lemma search_step_l:
+  assumes
+    "<btree_assn l lp>
+       search\<^sub>i lp x
+     <\<lambda>res. \<up>(res = search l x)>"
+  shows
+    "<p \<mapsto>\<^sub>r Btnode v lp rp * btree_assn l lp * btree_assn r rp>
+       search\<^sub>i lp x
+     <\<lambda>res.
+        p \<mapsto>\<^sub>r Btnode v lp rp *
+        btree_assn l lp *
+        btree_assn r rp *
+        \<up>(res = search l x)>"
+proof -
+  have emp_case: "<p \<mapsto>\<^sub>r Btnode v lp None  * btree_assn l lp>
+      search\<^sub>i lp x
+   <\<lambda>res. p \<mapsto>\<^sub>r Btnode v lp None  * \<up>(res = search l x)>"
+    by (rule frame_rule_left[OF assms])
+  have
+  "<p \<mapsto>\<^sub>r Btnode v lp rp * btree_assn r rp * btree_assn l lp>
+      search\<^sub>i lp x
+   <\<lambda>res. p \<mapsto>\<^sub>r Btnode v lp rp * btree_assn r rp * \<up>(res = search l x)>"
+  by (rule frame_rule_left[OF assms])
+  then show ?thesis
+    using assms emp_case
+    apply (cases r; cases rp; sep_auto; simp add : emp_case)
+    oops
+lemma search_equiv : "
+  <btree_assn t p> search\<^sub>i p x <\<lambda>r. btree_assn t p * \<up>(r = search t x)>"
+proof (induction t x arbitrary: x rule: search.induct)
+  case (1 x)
+  show ?case
+    using btree_assn.simps
+    by (cases p; subst search\<^sub>i.simps; sep_auto)
+next
+  case Node_h: (2 v l r x)
+  then show ?case 
+  proof (cases p)
+    case None
+    then show ?thesis 
+      by (subst search\<^sub>i.simps; sep_auto)
+  next
+    case (Some q)
+    consider "x = v"|"x < v"|"x > v" by fastforce
+    then show ?thesis 
+    proof (cases)
+      case 1
+      then show ?thesis 
+        by (subst search\<^sub>i.simps; sep_auto)
+    next
+      case 2
+      then show ?thesis 
+      proof (cases l)
+        case Leaf
+        have "<btree_assn (bin_tree.Node v .. r) (Some q)> search\<^sub>i (Some q) x 
+        <\<lambda>ra. btree_assn (bin_tree.Node v .. r) (Some q) *  \<up> (ra = undefined)>"
+          using 2 Node_h search\<^sub>i.simps btree_assn.simps 
+          
+          sorry
+        have "<btree_assn (bin_tree.Node v .. r) p>
+        search\<^sub>i p x
+        <\<lambda>ra. btree_assn (bin_tree.Node v .. r) p *  \<up> (ra = search (bin_tree.Node v .. r) x)> \<Longrightarrow>
+        <btree_assn (bin_tree.Node v .. r) p> 
+        search\<^sub>i p x
+        <\<lambda>ra. btree_assn (bin_tree.Node v .. r) p *  \<up> (ra = undefined)>"
+          using 2 Node_h search.simps
+          by (metis (full_types) not_less_iff_gr_or_eq search.simps(1,2))
+        then show ?thesis
+          sorry
+      next
+        case (Node x21 x22 x23)
+        then show ?thesis sorry
+      qed
+        
+    next
+      case 3
+      then show ?thesis 
+        sorry
+    qed
+  qed
 qed
 
 lemma search_max_equiv: "
@@ -127,33 +240,7 @@ next
     sorry
 qed
 
-lemma none_equiv :
-shows "<emp> 
-  return None 
-  <\<lambda>r. btree_assn Leaf r>"
-  unfolding hoare_triple_def snga_assn_def one_assn_def
-  apply (auto
-    elim!: run_elims
-    simp: relH_def in_range.simps mod_emp Abs_assn_inverse
-  )
-  done
 
-partial_function (heap) leaf\<^sub>i :: "'a::{heap} \<Rightarrow> 'a btnode ref option Heap" where 
-"leaf\<^sub>i x = do {
-    p \<leftarrow> ref (Btnode x None None); 
-    return (Some p)
-  }"
-
-lemma leaf_equiv:
-shows "<emp> 
-  leaf\<^sub>i x 
-  <\<lambda>r. btree_assn (bin_tree.Node x .. ..) r>"
-
-proof -
-  have h: "\<And>xa. xa \<mapsto>\<^sub>r Btnode x None None \<Longrightarrow>\<^sub>A xa \<mapsto>\<^sub>r Btnode x ((\<lambda>x. None) xa) ((\<lambda>x. None) xa) * btree_assn .. ((\<lambda>x. None) xa) * btree_assn .. ((\<lambda>x. None) xa)"
-    by sep_auto
-  then show ?thesis by (simp add: leaf\<^sub>i.simps; sep_auto; blast)
-qed
 
 lemma insert_leaf_equiv :
 shows "<emp> 
@@ -325,7 +412,6 @@ next
   then show ?case
   proof cases
     case eq
-
     show ?thesis
     proof (cases p)
       case None
@@ -333,35 +419,27 @@ next
         by auto
     next
       case (Some q)
-
       show ?thesis
       proof (cases l)
         case Leaf
-
         then show ?thesis
           using Some eq
           by (simp add: delete\<^sub>i.simps; sep_auto)
       next
         case (Node lv ll lr)
         note l_Node = Node
-
         show ?thesis
         proof (cases r)
           case Leaf
-
           then show ?thesis
             using Some eq l_Node
             by (simp add: delete\<^sub>i.simps; sep_auto)
         next
           case (Node rv rl rr)
           note r_Node = Node
-
           show ?thesis
             using Some eq l_Node r_Node
-            by (
-              simp add: delete\<^sub>i.simps;
-              sep_auto heap: search_max_equiv IH_l
-            )
+            by auto
         qed
       qed
     qed
@@ -385,7 +463,6 @@ next
     qed
   next
     case gt
-
     show ?thesis
     proof (cases p)
       case None
@@ -393,13 +470,9 @@ next
         by auto
     next
       case (Some q)
-
       then show ?thesis
         using gt
-        by (
-          simp add: delete\<^sub>i.simps;
-          sep_auto heap: IH_r
-        )
+        by auto
     qed
   qed
 qed

@@ -373,6 +373,15 @@ subsection bst_is_present
 lemma bst_is_present_1 : "bst_is_present (Node v l r) v = True"
   by auto
 
+lemma search_work : "bst_invariant t \<Longrightarrow> x \<in> to_set t \<Longrightarrow> search t x = x"
+proof (induction t arbitrary: x)
+  case Leaf
+  then show ?case by auto 
+next
+  case (Node v l r)
+  then show ?case 
+    by auto
+qed
 
 (* ----------------------- insert_lists ----------------------- *)
 subsection insert_lists
@@ -734,25 +743,31 @@ lemma delete_invariant:
   assumes "bst_invariant t"
   shows "bst_invariant (delete t x)"
   using assms
-proof (induction t x arbitrary: x rule:delete.induct)
-  case (1 x)
+proof (induction t arbitrary: x)
+  case Leaf
   then show ?case 
     by auto
 next
-  case (2 v l r x)
-  consider "x = v" | "x < v" | "x > v" by fastforce
-  then show ?case 
+  case (Node v l r)
+  consider "x = v"|"x < v"|"x > v" by fastforce
+  then show ?case
   proof (cases)
     case 1
-    have "r = .. \<Longrightarrow> bst_invariant (l)"
-      by (metis bst_invariant.simps(2) "2.prems"(2))
-    have "l = .. \<Longrightarrow> bst_invariant (r)"  
-    by (metis bst_invariant.simps(2) "2.prems"(2)) 
-  have "\<And>vr lr rr vl ll rl. r = Node vr lr rr \<Longrightarrow> l = Node vl ll rl\<Longrightarrow>
-        bst_invariant (Node (search_max l) (delete l (search_max l)) r)" 
-    
-    sorry
-    then show ?thesis 
+    have "l = .. \<Longrightarrow> (delete (Node v l r) x) =  r"
+      using 1 Node delete.simps bst_invariant.simps 
+      by auto
+    have "\<And>vl ll rl. r  = .. \<and> l = Node vl ll rl\<Longrightarrow> (delete (Node v l r) x) = l"
+      using 1 Node delete.simps bst_invariant.simps 
+      by auto
+    have "\<And>vl ll rl vr lr rr. r  = Node vr lr rr \<and> l = Node vl ll rl \<Longrightarrow> 
+      (delete (Node v l r) x) = Node (search_max l) (delete l (search_max l)) r"
+      using 1 Node delete.simps bst_invariant.simps 
+      by auto
+    then have "\<And>vl ll rl.   l = Node vl ll rl \<Longrightarrow> 
+      bst_invariant (delete l (search_max l))"
+      
+    then show ?thesis
+      apply auto
       sorry
   next
     case 2

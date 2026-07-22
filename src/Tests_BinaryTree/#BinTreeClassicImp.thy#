@@ -142,11 +142,21 @@ sepref_definition bin_tree_imp_contains is "uncurry bin_tree_nres_contains" ::
   unfolding bin_tree_nres_contains_def
   by sepref
 lemma bt_assn_aux_insert[simp]:
-  assumes "ta = tc"
   shows "bin_tree_assn P (insert ta a) (insert tc c) 
     = bin_tree_assn P ta tc * P a c'"
-  sorry
-
+proof (induction ta)
+  case Leaf
+  have "bin_tree_assn P (insert ta a) (insert tc c) \<noteq> false \<Longrightarrow> tc = Leaf"
+    using bin_tree_assn.simps
+    sledgehammer
+  then show ?case 
+    
+    sorry
+next
+  case (Node v l r)
+  then show ?case sorry
+qed
+  oops
 lemma hn_insert[sepref_fr_rules]: 
   "hn_refine 
    (hn_ctxt (bin_tree_assn P) ta tc * hn_ctxt P a c)
@@ -158,7 +168,46 @@ lemma hn_insert[sepref_fr_rules]:
       apply blast
       apply fast
   subgoal
-    
+  proof (induction tc)
+    case Leaf
+    then show ?case sorry
+  next
+    case (Node vc lc rc)
+    consider "vc = c"|"vc > c"|"vc < c" by fastforce
+    then show ?case
+    proof (cases)
+      case c1: 1
+      then show ?thesis 
+        unfolding insert.simps
+      proof (induction ta)
+        case Leaf
+        then show ?case 
+          using Node bin_tree_assn.simps by simp
+      next
+        case (Node va la ra)
+        consider "va = a"|"va > a"|"va < a" by fastforce
+        then show ?case
+        proof (cases)
+          case 1
+          then show ?thesis 
+            using c1 apply simp
+        next
+          case 2
+          then show ?thesis sorry
+        next
+          case 3
+          then show ?thesis sorry
+        qed 
+      qed
+    next
+      case 2
+      then show ?thesis sorry
+    next
+      case 3
+      then show ?thesis sorry
+    qed
+      sorry
+  qed
     sorry
   subgoal 
     by (induction ta; auto)
@@ -174,79 +223,30 @@ sepref_definition bin_tree_imp_id is "bin_tree_nres_id" ::
   unfolding bin_tree_nres_id_def
   by sepref_dbg_keep
 
+
 definition bin_tree_nres_insert :: "('a::linorder) bin_tree \<Rightarrow> 'a \<Rightarrow> 'a bin_tree nres" where
-  "bin_tree_nres_insert t v \<equiv> RECT (\<lambda>D (t,v).
-     case t of
-       Leaf \<Rightarrow> RETURN (Node v Leaf Leaf)
-     | Node x l r \<Rightarrow>
-         if v < x then do {
-             l' \<leftarrow> D (l, v);
-             RETURN (Node x l' r)
-           }
-         else if x < v then do {
-             r' \<leftarrow> D (r, v);
-             RETURN (Node x l r')
-           }
-         else RETURN (Node x l r)
-   ) (t, v)"
-lemma bin_tree_nres_insert_unfold:
-  "bin_tree_nres_insert t v =
-    (case t of
-       Leaf \<Rightarrow> RETURN (Node v Leaf Leaf)
-     | Node x l r \<Rightarrow>
-         if v < x then do { l' \<leftarrow> bin_tree_nres_insert l v; RETURN (Node x l' r) }
-         else if x < v then do { r' \<leftarrow> bin_tree_nres_insert r v; RETURN (Node x l r') }
-         else RETURN (Node x l r))"
-  unfolding bin_tree_nres_insert_def
-  apply (subst RECT_unfold)
-  apply refine_mono
-  apply (cases t)
-  apply auto
-  done
-lemma bin_tree_nres_insert_correct:
-  "bin_tree_nres_insert t v \<le> RETURN (insert t v)"
-proof (induction t arbitrary: v)
-  case Leaf
-  then show ?case by (simp add: bin_tree_nres_insert_unfold)
-next
-  case (Node x l r)
-  show ?case
-  proof (cases "v < x")
-    case True
-    have "bin_tree_nres_insert (Node x l r) v
-          = do { l' \<leftarrow> bin_tree_nres_insert l v; RETURN (Node x l' r) }"
-      using True by (simp add: bin_tree_nres_insert_unfold)
-    also have "... \<le> do { l' \<leftarrow> RETURN (insert l v); RETURN (Node x l' r) }"
-      by (intro bind_mono Node.IH order_refl)
-    also have "... = RETURN (Node x (insert l v) r)" by simp
-    also have "... = RETURN (insert (Node x l r) v)"
-      using True by simp
-    finally show ?thesis .
-  next
-    case False
-    show ?thesis
-    proof (cases "x < v")
-      case True
-      have "bin_tree_nres_insert (Node x l r) v
-            = do { r' \<leftarrow> bin_tree_nres_insert r v; RETURN (Node x l r') }"
-        using False True by (simp add: bin_tree_nres_insert_unfold)
-      also have "... \<le> do { r' \<leftarrow> RETURN (insert r v); RETURN (Node x l r') }"
-        sorry
-        by (intro bind_mono Node.IH order_refl)
-      also have "... = RETURN (Node x l (insert r v))" by simp
-      also have "... = RETURN (insert (Node x l r) v)"
-        using False True by simp
-      finally show ?thesis .
-    next
-      case False2: False
-      with False have "v = x" sorry by (rule antisym[OF not_less not_less, simplified])
-      then show ?thesis
-        by (simp add: bin_tree_nres_insert_unfold False)
-    qed
-  qed
-qed
+  "bin_tree_nres_insert t x \<equiv> do {
+    (t', _) \<leftarrow> RECT(\<lambda>D (t, x).
+    case t of
+      Leaf \<Rightarrow> RETURN (Node x .. .., x) |
+      (Node v l r) \<Rightarrow> 
+        if x = v then RETURN (t,x)
+        else if x > v then do {
+            (l', _) \<leftarrow> D (l, x);
+            RETURN (Node v l' r, x)}
+        else do {
+          (r', _) \<leftarrow> D(r, x);
+          RETURN (Node v l r', x)
+        }
+  ) (t, x);
+  RETURN t'
+}"
+
 sepref_definition bin_tree_imp_insert is "uncurry bin_tree_nres_insert" ::
 "(bin_tree_assn  id_assn \<times>\<^sub>a id_assn)\<^sup>k \<rightarrow>\<^sub>a (bin_tree_assn id_assn)"
   unfolding bin_tree_nres_insert_def
-  by sepref_dbg_keep
+  apply sepref_dbg_keep
+  apply sepref_dbg_trans_keep
+  
+export_code bin_tree_imp_insert in Haskell
 end
